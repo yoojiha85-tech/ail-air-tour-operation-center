@@ -72,6 +72,7 @@ export default function App(){
   const [year,setYear]=useState(2026)
   const [period,setPeriod]=useState('year')
   const [periodValue,setPeriodValue]=useState('all')
+  const [statsMode,setStatsMode]=useState('reservation')
   const [calendarDate,setCalendarDate]=useState(new Date(2026,7,1))
   const [invite,setInvite]=useState({display_name:'',email:'',role:'staff',permissions:{...defaultPerms}})
   const [modal,setModal]=useState(null)
@@ -108,8 +109,9 @@ export default function App(){
   const payMap=useMemo(()=>Object.fromEntries(rows.map(r=>[r.id,payments.filter(x=>x.reservation_id===r.id).reduce((a,b)=>a+num(b.amount),0)])),[rows,payments])
   const expMap=useMemo(()=>Object.fromEntries(rows.map(r=>[r.id,expenses.filter(x=>x.reservation_id===r.id).reduce((a,b)=>a+num(b.amount_krw),0)])),[rows,expenses])
 
-  function inPeriod(r){
-    const d=new Date(r.departure_date)
+  function matchesPeriodDate(value){
+    if(!value)return false
+    const d=new Date(value)
     if(Number.isNaN(d.getTime())||d.getFullYear()!==Number(year))return false
     const m=d.getMonth()+1
     if(period==='year')return true
@@ -118,13 +120,59 @@ export default function App(){
     if(period==='month')return m===Number(periodValue)
     return true
   }
+
+  function inPeriod(r){
+    return matchesPeriodDate(r.departure_date)
+  }
+
   const periodRows=rows.filter(inPeriod)
-  const stats=useMemo(()=>{
+
+  const reservationStats=useMemo(()=>{
     const sale=periodRows.reduce((a,r)=>a+num(r.sale_amount),0)
     const paid=periodRows.reduce((a,r)=>a+num(payMap[r.id]),0)
     const expense=periodRows.reduce((a,r)=>a+num(expMap[r.id]),0)
-    return {count:periodRows.length,people:periodRows.reduce((a,r)=>a+num(r.traveler_count),0),sale,paid,expense,profit:sale-expense,balance:sale-paid}
+    return {
+      count:periodRows.length,
+      people:periodRows.reduce((a,r)=>a+num(r.traveler_count),0),
+      sale,paid,expense,profit:sale-expense,balance:sale-paid
+    }
   },[periodRows,payMap,expMap])
+
+  const accountingStats=useMemo(()=>{
+    const periodPayments=payments.filter(p=>matchesPeriodDate(p.payment_date))
+    const periodExpenses=expenses.filter(e=>matchesPeriodDate(e.paid_date || e.due_date))
+    const paid=periodPayments.reduce((a,p)=>a+num(p.amount),0)
+    const expense=periodExpenses.reduce((a,e)=>a+num(e.amount_krw),0)
+    return {
+      paid, expense,
+      paymentCount:periodPayments.length,
+      expenseCount:periodExpenses.length
+    }
+  },[payments,expenses,year,period,periodValue])
+
+  const stats=statsMode==='reservation' ? reservationStats : {
+    ...reservationStats,
+    paid:accountingStats.paid,
+    expense:accountingStats.expense,
+    profit:reservationStats.sale-accountingStats.expense,
+    balance:reservationStats.sale-accountingStats.paid
+  }
+
+  const overpaymentRows=useMemo(()=>periodRows
+    .map(r=>({...r,paid:num(payMap[r.id]),overpaid:num(payMap[r.id])-num(r.sale_amount)}))
+    .filter(r=>r.overpaid>0)
+    .sort((a,b)=>b.overpaid-a.overpaid),[periodRows,payMap])
+
+  const zeroSalePaidRows=useMemo(()=>periodRows
+    .map(r=>({...r,paid:num(payMap[r.id])}))
+    .filter(r=>num(r.sale_amount)===0 && r.paid>0),[periodRows,payMap])
+
+  const uncategorizedExpenses=useMemo(()=>{
+    const ids=new Set(periodRows.map(r=>r.id))
+    return expenses.filter(e=>ids.has(e.reservation_id) && e.expense_type==='other')
+  },[expenses,periodRows])
+
+  const uncategorizedTotal=useMemo(()=>uncategorizedExpenses.reduce((a,e)=>a+num(e.amount_krw),0),[uncategorizedExpenses])
 
   const overdue=useMemo(()=>rows.filter(r=>r.partner_remittance_deadline && !r.partner_remittance_done && new Date(r.partner_remittance_deadline)<new Date()),[rows])
 
@@ -262,8 +310,14 @@ export default function App(){
           <div><small>거래처 송금 알림</small><strong>{overdue.length}건의 송금 확인이 필요합니다.</strong></div>
           {overdue.slice(0,3).map(r=><div className="alertRow" key={r.id}><b>{r.customer_name} · {r.title}</b><span>출발 {ymd(r.departure_date)}</span><em>송금기한 {ymd(r.partner_remittance_deadline)}</em></div>)}
         </section>}
-        <section className="periodBar">
-          <div><small>정산 기준</small><b>출발일 기준 기간별 정산</b></div>
+        <section className="periodBar periodBarStack">
+          <div className="periodTop">
+            <div><small>기간별 통계</small><b>{statsMode==='reservation'?'출발일 기준 예약통계':'실제 입금일·지출일 기준 회계통계'}</b></div>
+            <div className="statsMode">
+              <button className={statsMode==='reservation'?'active':''} onClick={()=>setStatsMode('reservation')}>예약통계</button>
+              <button className={statsMode==='accounting'?'active':''} onClick={()=>setStatsMode('accounting')}>회계통계</button>
+            </div>
+          </div>
           <div className="filters"><label>연도<select value={year} onChange={e=>setYear(Number(e.target.value))}>{yearOptions.map(y=><option key={y}>{y}</option>)}</select></label>
           {['year','quarter','half','month'].map(p=><button className={period===p?'active':''} onClick={()=>changePeriod(p)} key={p}>{p==='year'?'연도별':p==='quarter'?'분기별':p==='half'?'상·하반기':'월별'}</button>)}</div>
         </section>
@@ -273,11 +327,23 @@ export default function App(){
           {period==='month'&&Array.from({length:12},(_,i)=>i+1).map(x=><button className={String(periodValue)===String(x)?'active':''} onClick={()=>setPeriodValue(String(x))}>{x}월</button>)}
         </div>}
         <section className="cards">
-          <div><span>예약 건수</span><strong>{stats.count}건</strong><small>총 {stats.people}명</small></div>
-          <div><span>총 매출</span><strong>{won(stats.sale)}</strong><small>선택 기간 판매금액</small></div>
-          <div><span>고객 입금</span><strong>{won(stats.paid)}</strong><small>미수금 {won(stats.balance)}</small></div>
-          <div><span>예상 순이익</span><strong>{won(stats.profit)}</strong><small>총 지출 {won(stats.expense)}</small></div>
+          <div><span>{statsMode==='reservation'?'예약 건수':'출발 예약 건수'}</span><strong>{reservationStats.count}건</strong><small>총 {reservationStats.people}명</small></div>
+          <div><span>총 매출</span><strong>{won(reservationStats.sale)}</strong><small>출발일 기준 선택기간 판매금액</small></div>
+          <div><span>{statsMode==='reservation'?'해당 예약 누적 입금':'실제 기간 입금'}</span><strong>{won(stats.paid)}</strong><small>{statsMode==='reservation'?`미수·초과 ${won(stats.balance)}`:`입금 ${accountingStats.paymentCount}건`}</small></div>
+          <div><span>{statsMode==='reservation'?'예상 순이익':'기간 현금흐름'}</span><strong>{won(statsMode==='reservation'?stats.profit:accountingStats.paid-accountingStats.expense)}</strong><small>{statsMode==='reservation'?`총 지출 ${won(stats.expense)}`:`실제 지출 ${won(accountingStats.expense)} · ${accountingStats.expenseCount}건`}</small></div>
         </section>
+
+        {(overpaymentRows.length>0 || zeroSalePaidRows.length>0 || uncategorizedTotal>0) && <section className="dataWarn">
+          <div className="warnHead"><strong>⚠ 데이터 점검 필요</strong><span>기간 통계 왜곡 가능 항목</span></div>
+          {zeroSalePaidRows.length>0 && <div className="warnItem"><b>매출 0원인데 입금 존재</b><span>{zeroSalePaidRows.length}건 · {won(zeroSalePaidRows.reduce((a,r)=>a+r.paid,0))}</span></div>}
+          {overpaymentRows.length>0 && <div className="warnItem"><b>매출보다 입금이 많은 예약</b><span>{overpaymentRows.length}건 · 초과 {won(overpaymentRows.reduce((a,r)=>a+r.overpaid,0))}</span></div>}
+          {uncategorizedTotal>0 && <div className="warnItem"><b>기타·미분류 원가</b><span>{uncategorizedExpenses.length}건 · {won(uncategorizedTotal)}</span></div>}
+          <details><summary>점검 대상 상세 보기</summary>
+            <div className="warnDetails">
+              {overpaymentRows.slice(0,20).map(r=><div key={r.id}><span>{r.customer_name} · {ymd(r.departure_date)}</span><b>초과 {won(r.overpaid)}</b></div>)}
+            </div>
+          </details>
+        </section>}
       </>}
 
       {page==='dashboard'&&<>
@@ -293,7 +359,7 @@ export default function App(){
             <div><span>항공 원가</span><b>{won(expenses.filter(e=>productRows('honeymoon').some(r=>r.id===e.reservation_id)&&['international_air','domestic_air'].includes(e.expense_type)).reduce((a,e)=>a+num(e.amount_krw),0))}</b></div>
             <div><span>호텔 원가</span><b>{won(expenses.filter(e=>productRows('honeymoon').some(r=>r.id===e.reservation_id)&&e.expense_type==='hotel').reduce((a,e)=>a+num(e.amount_krw),0))}</b></div>
             <div><span>랜드 원가</span><b>{won(expenses.filter(e=>productRows('honeymoon').some(r=>r.id===e.reservation_id)&&e.expense_type==='land').reduce((a,e)=>a+num(e.amount_krw),0))}</b></div>
-            <div><span>통합·미분류 원가</span><b>{won(expenses.filter(e=>productRows('honeymoon').some(r=>r.id===e.reservation_id)&&!['international_air','domestic_air','hotel','land'].includes(e.expense_type)).reduce((a,e)=>a+num(e.amount_krw),0))}</b></div>
+            <div className="uncat"><span>기타·미분류 원가</span><b>{won(expenses.filter(e=>productRows('honeymoon').some(r=>r.id===e.reservation_id)&&!['international_air','domestic_air','hotel','land'].includes(e.expense_type)).reduce((a,e)=>a+num(e.amount_krw),0))}</b><small>재분류 필요</small></div>
           </div></section>}
         <section className="panel"><div className="panelHead"><div><h2>{TYPE[page]} 예약내역</h2><p>선택 기간 예약 목록</p></div></div>
           <div className="tableWrap"><table><thead><tr><th>예약번호</th><th>고객</th><th>상품/지역</th><th>출발일</th><th>인원</th><th>매출</th><th>입금</th><th>지출</th><th>순이익</th><th>관리</th></tr></thead>
