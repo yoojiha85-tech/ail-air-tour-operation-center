@@ -156,3 +156,91 @@
 /* 2026-08 reservation detail operational CRUD */
 .detailHeadActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.recordLine{display:flex;align-items:center;justify-content:space-between;gap:10px}.recordActions{display:inline-flex;align-items:center;gap:5px;flex-wrap:wrap}.recordActions button{border:1px solid #dbe4ee;background:#fff;color:#334155;border-radius:7px;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer}.recordActions button:hover{background:#f8fafc}.recordActions .dangerText{color:#b91c1c;border-color:#fecaca;background:#fff7f7}.documentActions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end}.operationalModal{width:min(760px,94vw);max-height:90vh;overflow:auto}.operationalModal .modalLead{margin:-6px 0 12px;color:#64748b;font-size:13px}.operationalModal .checkField{align-content:center;min-height:64px}.detailSectionHead .mini{white-space:nowrap}
 @media(max-width:700px){.recordLine{align-items:flex-start}.documentRow{align-items:flex-start}.documentActions{justify-content:flex-start}.operationalModal{width:96vw;max-height:96vh;border-radius:14px}.detailHeadActions{justify-content:flex-start}.recordActions button{padding:6px 8px}}
+.scopeHint{display:inline-flex;margin-top:6px;padding:4px 8px;border-radius:999px;background:#eef4ff;color:#315f9f;font-size:11px;font-weight:800}
+
+
+/* 2026-08-30 modal close UX */
+.detailFooter{position:sticky;bottom:0;display:flex;justify-content:flex-end;padding:14px 22px;background:rgba(248,250,252,.97);border-top:1px solid #e2e8f0;backdrop-filter:blur(8px);z-index:4}
+.closeDetailBtn{display:inline-flex;align-items:center;gap:6px;min-width:96px;justify-content:center;font-weight:800}
+.readOnlyClose{border-top:1px solid #edf1f5;padding-top:14px;margin-top:14px}
+.readOnlyClose .secondary{display:inline-flex;align-items:center;gap:6px}
+@media(max-width:700px){.detailFooter{padding:12px 14px}.closeDetailBtn{width:100%}}
+
+/* Unsaved-change protection for editable modals */
+.modalBox.hasUnsaved{outline:2px solid rgba(217,119,6,.28);outline-offset:-2px}
+.modalBox.hasUnsaved:before{content:'저장되지 않은 변경사항';position:absolute;top:14px;left:18px;z-index:6;padding:5px 9px;border-radius:999px;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa;font-size:11px;font-weight:800;box-shadow:0 2px 8px rgba(15,23,42,.06)}
+.modalBox.hasUnsaved>h2:first-of-type{padding-top:22px}
+@media(max-width:650px){.modalBox.hasUnsaved:before{top:10px;left:12px;font-size:10px}.modalBox.hasUnsaved>h2:first-of-type{padding-top:26px}}
+
+
+/* Data quality warning -> reservation popup */
+.warnItemClickable{width:100%;font:inherit;text-align:left;cursor:pointer;border:0;background:transparent;color:inherit}
+.warnItemClickable:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(15,23,42,.08)}
+.warnItemClickable:focus-visible{outline:2px solid currentColor;outline-offset:2px}
+.warnItemClickable span{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.warnItemClickable em{font-style:normal;font-size:12px;font-weight:800;opacity:.75}
+.qualityIssueModal{width:min(920px,calc(100vw - 28px));max-height:88vh;overflow:auto}
+.qualityModalHead{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;margin-bottom:18px;padding-right:36px}
+.qualityModalHead small{font-size:11px;font-weight:800;letter-spacing:.12em;opacity:.58}
+.qualityModalHead h2{margin:5px 0 6px}
+.qualityModalHead p{margin:0;opacity:.68;line-height:1.55}
+.qualityCountBadge{white-space:nowrap;border-radius:999px;padding:7px 11px;font-size:12px;font-weight:800;background:rgba(245,158,11,.12)}
+.qualityIssueList{display:grid;gap:8px}
+.qualityIssueRow{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:18px;text-align:left;border:1px solid rgba(148,163,184,.28);background:var(--panel,#fff);border-radius:13px;padding:14px 15px;cursor:pointer;color:inherit;font:inherit}
+.qualityIssueRow:hover{border-color:rgba(59,130,246,.55);box-shadow:0 7px 18px rgba(15,23,42,.07)}
+.qualityIssueMain{display:grid;gap:4px;min-width:0}
+.qualityIssueMain b{font-size:14px}
+.qualityIssueMain small{opacity:.62;white-space:normal}
+.qualityIssueAmount{display:grid;justify-items:end;gap:3px;min-width:170px}
+.qualityIssueAmount span{font-size:12px;opacity:.62}
+.qualityIssueAmount strong{font-size:14px}
+.qualityIssueAmount em{font-size:11px;font-style:normal;font-weight:800;opacity:.7}
+@media(max-width:720px){.qualityIssueRow{grid-template-columns:1fr}.qualityIssueAmount{justify-items:start;min-width:0}.qualityModalHead{display:block}.qualityCountBadge{display:inline-block;margin-top:10px}}
+
+/* Data quality quick-fix */
+.qualityIssueActionRow{display:flex;align-items:stretch;gap:10px;padding:0;overflow:hidden}
+.qualityIssueOpen{flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 16px;border:0;background:transparent;text-align:left;cursor:pointer;color:inherit}
+.qualityQuickActions{display:flex;align-items:center;gap:7px;padding:10px 12px 10px 0;white-space:nowrap}
+.qualityReclassModal{width:min(820px,calc(100vw - 28px));max-height:88vh;overflow:auto}
+.reclassList{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.reclassRow{display:grid;grid-template-columns:minmax(220px,1fr) auto minmax(175px,220px);gap:14px;align-items:center;padding:13px 14px;border:1px solid var(--line,#dfe5ec);border-radius:12px;background:#fff}
+.reclassRow>div{display:flex;flex-direction:column;gap:3px;min-width:0}.reclassRow small{color:#697586;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.reclassRow strong{text-align:right}.reclassRow select{width:100%}
+.qualityReclassNotice{margin-top:14px;padding:12px 14px;border-radius:10px;background:#fff7dc;color:#69531a;font-size:13px;line-height:1.55}
+@media(max-width:720px){.qualityIssueActionRow{display:block}.qualityIssueOpen{width:100%;display:block}.qualityQuickActions{padding:0 14px 14px}.qualityQuickActions button{flex:1}.reclassRow{grid-template-columns:1fr auto}.reclassRow select{grid-column:1/-1}.qualityIssueAmount{margin-top:8px}}
+
+/* Data quality quick-fix */
+.qualityIssueActionRow{display:flex;align-items:stretch;gap:10px;padding:0;overflow:hidden}
+.qualityIssueOpen{flex:1;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:15px 16px;border:0;background:transparent;text-align:left;cursor:pointer;color:inherit}
+.qualityQuickActions{display:flex;align-items:center;gap:7px;padding:10px 12px 10px 0;white-space:nowrap}
+.qualityReclassModal{width:min(820px,calc(100vw - 28px));max-height:88vh;overflow:auto}
+.reclassList{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.reclassRow{display:grid;grid-template-columns:minmax(220px,1fr) auto minmax(175px,220px);gap:14px;align-items:center;padding:13px 14px;border:1px solid var(--line,#dfe5ec);border-radius:12px;background:#fff}
+.reclassRow>div{display:flex;flex-direction:column;gap:3px;min-width:0}.reclassRow small{color:#697586;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.reclassRow strong{text-align:right}.reclassRow select{width:100%}
+.qualityReclassNotice{margin-top:14px;padding:12px 14px;border-radius:10px;background:#fff7dc;color:#69531a;font-size:13px;line-height:1.55}
+@media(max-width:720px){.qualityIssueActionRow{display:block}.qualityIssueOpen{width:100%;display:block}.qualityQuickActions{padding:0 14px 14px}.qualityQuickActions button{flex:1}.reclassRow{grid-template-columns:1fr auto}.reclassRow select{grid-column:1/-1}.qualityIssueAmount{margin-top:8px}}
+
+/* 현황별 수익 보고서 */
+.reportBtn{display:inline-flex;align-items:center;justify-content:center;border:1px solid #c7d2fe;background:#eef2ff;color:#253b80;font-weight:800;border-radius:10px;padding:9px 14px;cursor:pointer}
+.profitReportModal{width:min(1240px,96vw);max-height:92vh;overflow:auto;background:#fff}
+.profitReportHeader{display:flex;justify-content:space-between;gap:20px;align-items:flex-start;border-bottom:2px solid #172554;padding-bottom:18px;margin-bottom:16px}
+.profitReportHeader small{display:block;font-weight:800;letter-spacing:.08em;color:#64748b;margin-bottom:6px}.profitReportHeader h1{margin:0;color:#0f172a;font-size:27px}.profitReportHeader p{margin:7px 0 0;color:#64748b}
+.profitReportActions{display:flex;gap:8px;padding-right:42px}.reportMeta{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 14px}.reportMeta span{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;color:#64748b;font-size:12px}.reportMeta b{display:block;color:#0f172a;font-size:14px;margin-top:4px}
+.reportKpiGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}.reportKpiGrid>div{border:1px solid #e2e8f0;border-radius:12px;padding:15px;background:#fff}.reportKpiGrid span{display:block;color:#64748b;font-size:12px;font-weight:700}.reportKpiGrid b{display:block;font-size:21px;color:#0f172a;margin:6px 0}.reportKpiGrid small{color:#64748b}.reportKpiGrid .reportProfitKpi{background:#f0fdf4;border-color:#bbf7d0}.reportKpiGrid .reportProfitKpi b{color:#166534}
+.reportSection{border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-top:12px}.reportSectionHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}.reportSectionHead h3{margin:0;color:#0f172a}.reportSectionHead span{font-size:12px;color:#64748b;font-weight:700}.reportCostGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.reportCostGrid>div{background:#f8fafc;border-radius:9px;padding:11px}.reportCostGrid span{display:block;color:#64748b;font-size:12px}.reportCostGrid b{display:block;color:#0f172a;margin-top:4px}.reportCostGrid .reportWarn{background:#fff7ed}.reportCostGrid .reportWarn b{color:#c2410c}
+.reportTableWrap{overflow:auto}.reportTable{width:100%;border-collapse:collapse;font-size:12px}.reportTable th,.reportTable td{padding:9px 7px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap}.reportTable th{background:#f8fafc;color:#475569;font-size:11px}.reportTable th:nth-child(-n+5),.reportTable td:nth-child(-n+5){text-align:left}.reportGain{color:#166534;font-weight:800}.reportLoss{color:#b91c1c;font-weight:800}.reportFoot{display:flex;flex-direction:column;gap:3px;color:#64748b;font-size:11px;margin:12px 2px 0}
+@media(max-width:760px){.profitReportHeader{display:block}.profitReportActions{padding:12px 0 0}.reportMeta,.reportKpiGrid,.reportCostGrid{grid-template-columns:1fr 1fr}.profitReportModal{width:100vw;max-height:100vh;border-radius:0}.reportKpiGrid b{font-size:17px}}
+@media print{
+  @page{size:A4 landscape;margin:10mm}
+  body *{visibility:hidden!important}
+  .printProfitReport,.printProfitReport *{visibility:visible!important}
+  .printProfitReport{position:absolute!important;left:0!important;top:0!important;width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important}
+  .reportNoPrint,.printProfitReport .close{display:none!important}
+  .profitReportHeader{margin-bottom:10px;padding-bottom:10px}.profitReportHeader h1{font-size:22px}
+  .reportMeta{grid-template-columns:repeat(4,1fr);gap:5px}.reportMeta span{padding:6px;font-size:9px}.reportMeta b{font-size:10px}
+  .reportKpiGrid{gap:5px;margin-bottom:8px}.reportKpiGrid>div{padding:8px}.reportKpiGrid b{font-size:14px;margin:3px 0}.reportKpiGrid span,.reportKpiGrid small{font-size:9px}
+  .reportSection{padding:8px;margin-top:7px;border-radius:4px;break-inside:auto}.reportCostGrid{gap:5px}.reportCostGrid>div{padding:6px}.reportCostGrid span,.reportCostGrid b{font-size:9px}
+  .reportTable{font-size:8px}.reportTable th,.reportTable td{padding:4px 3px}.reportTable th{font-size:7.5px}
+  .reportTable tr{break-inside:avoid}.reportFoot{font-size:8px;margin-top:6px}
+}
+.periodTopActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+@media(max-width:760px){.periodTopActions{width:100%;justify-content:space-between}.periodTopActions .reportBtn{flex:0 0 auto}}
