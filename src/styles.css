@@ -244,3 +244,47 @@
 }
 .periodTopActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 @media(max-width:760px){.periodTopActions{width:100%;justify-content:space-between}.periodTopActions .reportBtn{flex:0 0 auto}}
+
+/* 2026-08-30 AIL dashboard visual polish — functionality unchanged */
+:root{--ail-navy:#12385f;--ail-navy-deep:#0c2c4d;--ail-blue:#2f6fd3;--ail-bg:#f4f7fb;--ail-panel:#ffffff;--ail-line:#dfe6ef;--ail-muted:#7d8da2;--ail-shadow:0 8px 28px rgba(17,48,82,.055)}
+body{background:var(--ail-bg)}
+.shell main{padding:30px 38px 48px}.top{align-items:center}.top h1{font-size:32px;letter-spacing:-.035em;color:#0d2743}.top p{margin:6px 0 0;font-size:14px}.primary{min-height:42px;border-radius:9px;box-shadow:0 4px 12px rgba(47,107,216,.14)}
+
+/* Statistics control panel */
+.periodBar.periodBarStack{padding:18px 20px 17px;border-radius:16px;box-shadow:var(--ail-shadow);border-color:#dde5ef;gap:16px}
+.periodTop{align-items:flex-start}.periodTop>div:first-child{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:230px}.periodTop small{font-size:12px;color:#65778e;font-weight:700}.periodTop b{font-size:15px;color:#102a47}.scopeHint{margin-top:4px;background:#edf4ff;color:#3568a8;padding:4px 9px}
+.periodTopActions{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:nowrap}.statsMode{display:inline-flex;gap:4px;padding:3px;background:#eef3f8;border:1px solid #dce5ef;border-radius:10px}.statsMode button{height:38px;min-width:88px;border:0!important;border-radius:8px!important;padding:0 14px!important;background:transparent!important;color:#53657a;font-weight:700}.statsMode button.active{background:var(--ail-navy)!important;color:#fff!important;box-shadow:0 3px 9px rgba(18,56,95,.16)}
+.reportBtn{height:44px;min-width:110px;border-radius:9px;border:1px solid #a9bfdf;background:#fff;color:#164577;padding:0 15px;box-shadow:none}.reportBtn:hover{background:#f1f6fc;border-color:#7698c4}
+.filters{padding-top:1px;gap:8px;flex-wrap:wrap}.filters label{font-size:13px;font-weight:700;color:#40546b}.filters select{height:42px;min-width:96px;background:#f8fafc;border-color:#dce4ee;padding:0 12px}.filters button{height:42px;min-width:74px;background:#f7f9fc;border-color:#dce4ee;color:#334960;font-weight:700;padding:0 13px}.filters button.active{background:#fff;color:#2f67bd;border-color:#c9d7e8;box-shadow:0 3px 9px rgba(41,79,124,.10)}
+.subFilter{margin:10px 0 3px;padding-left:2px}.subFilter button{height:36px;padding:0 13px;border-radius:8px}
+
+/* KPI cards */
+.cards{gap:16px;margin:18px 0}.cards>div{min-height:142px;padding:21px 22px;border-radius:15px;box-shadow:var(--ail-shadow);border-left-width:4px}.cards span{font-size:13px;font-weight:650}.cards strong{font-size:25px;letter-spacing:-.025em;margin:12px 0 8px}.cards small{font-size:12px;line-height:1.45}
+
+/* Data quality panel: header + equal three issue cards */
+.dataWarn{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));border-radius:15px;box-shadow:0 6px 22px rgba(164,113,15,.05);margin:17px 0 22px;background:#fffaf1;border-color:#efd7a1;overflow:hidden}
+.warnHead{grid-column:1/-1;padding:13px 16px;background:#fff3d6;border-bottom:1px solid #f0dfb7}.warnHead strong{font-size:14px;color:#213044}.warnHead span{margin-left:2px;color:#8c7132}
+.warnItem{min-width:0;margin:0;padding:15px 17px;border:0;border-right:1px solid #efe0bd;border-top:0;background:rgba(255,255,255,.46);display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:7px;min-height:88px}.warnItem:nth-of-type(3){border-right:0}.warnItem b{font-size:13px;color:#182d45}.warnItem span{width:100%;display:flex;align-items:center;gap:5px;flex-wrap:wrap;color:#a66a10;font-weight:800;font-size:13px}.warnItem em{margin-left:auto;color:#8b5b13;opacity:.9}.warnItemClickable:hover{transform:none;background:#fff;box-shadow:inset 0 0 0 1px #e6c57c}
+.dataWarn details{grid-column:1/-1;border-top:1px solid #efdfba;padding:11px 16px;background:#fffdf8}.dataWarn summary{font-size:13px;color:#314459}
+
+/* Panels / today work center */
+.panel{border-radius:16px;border-color:#dfe6ef;box-shadow:var(--ail-shadow)}.panelHead{padding:18px 20px}.panelHead h2{font-size:22px;letter-spacing:-.025em;color:#142d48}.panelHead p{line-height:1.5}.masterTodayWorkCenter{margin-top:20px}
+
+/* Profit report modal */
+.modalBack.printReportBack{background:rgba(7,25,44,.52);backdrop-filter:blur(3px);padding:22px}
+.profitReportModal{width:min(1280px,96vw);max-height:94vh;padding:0;border-radius:18px;overflow:auto;box-shadow:0 28px 80px rgba(7,25,44,.28)}
+.profitReportModal>.close{top:18px;right:18px;z-index:5;width:34px;height:34px;border-radius:9px;background:#f2f5f8;color:#5e7186}
+.profitReportHeader{position:sticky;top:0;z-index:4;margin:0;padding:22px 68px 18px 24px;background:rgba(255,255,255,.97);backdrop-filter:blur(10px);border-bottom:1px solid #dfe7f0;align-items:center}
+.profitReportHeader small{font-size:10px;letter-spacing:.14em;color:#6f839b}.profitReportHeader h1{font-size:25px;letter-spacing:-.03em;color:#102b48}.profitReportHeader p{font-size:12px;margin-top:5px}.profitReportActions{padding-right:0;align-items:center}.profitReportActions .secondary,.profitReportActions .primary{height:39px;padding:0 14px;border-radius:8px}
+.reportMeta{margin:18px 20px 12px;gap:8px}.reportMeta span{min-height:62px;border-radius:10px;background:#f7f9fc;padding:10px 12px}.reportMeta b{font-size:13px;margin-top:5px}
+.reportKpiGrid{margin:0 20px 14px;gap:0;border:1px solid #dfe6ee;border-radius:12px;overflow:hidden;background:#fff}.reportKpiGrid>div{border:0;border-right:1px solid #e4eaf1;border-radius:0;padding:16px 18px;min-height:94px}.reportKpiGrid>div:last-child{border-right:0}.reportKpiGrid span{font-size:11px}.reportKpiGrid b{font-size:20px;letter-spacing:-.025em}.reportKpiGrid small{font-size:11px}.reportKpiGrid .reportProfitKpi{background:#f2fbf6}.reportKpiGrid .reportProfitKpi b{color:#16824f}
+.reportSection{margin:13px 20px 0;padding:0;border-radius:12px;overflow:hidden;background:#fff}.reportSectionHead{min-height:48px;margin:0;padding:12px 15px;border-bottom:1px solid #e6ebf1;background:#fafbfd}.reportSectionHead h3{font-size:15px;letter-spacing:-.015em}.reportCostGrid{gap:0}.reportCostGrid>div{background:#fff;border-right:1px solid #edf1f5;border-radius:0;padding:14px 16px;min-height:72px}.reportCostGrid>div:last-child{border-right:0}.reportCostGrid span{font-size:11px}.reportCostGrid b{font-size:15px;margin-top:7px}.reportCostGrid .reportWarn{background:#fff8ee}
+.reportTableWrap{max-height:420px;overflow:auto}.reportTable{font-size:12px}.reportTable thead{position:sticky;top:0;z-index:2}.reportTable th{height:38px;padding:9px 10px;background:#f5f8fb;color:#536579;border-bottom:1px solid #dfe6ed}.reportTable td{padding:10px;border-bottom:1px solid #edf1f4}.reportTable tbody tr:hover{background:#f8fbff}.reportGain{color:#16824f}.reportLoss{color:#c34040}.reportFoot{margin:12px 22px 20px;color:#738499;line-height:1.5}
+
+@media(max-width:980px){.periodTop{display:grid;grid-template-columns:1fr}.periodTopActions{margin-left:0;justify-content:flex-start}.dataWarn{grid-template-columns:1fr}.warnHead,.dataWarn details{grid-column:1}.warnItem{border-right:0;border-bottom:1px solid #efe0bd}.reportKpiGrid{grid-template-columns:repeat(2,1fr)}.reportKpiGrid>div:nth-child(2){border-right:0}.reportKpiGrid>div:nth-child(-n+2){border-bottom:1px solid #e4eaf1}}
+@media(max-width:760px){.shell main{padding:18px 14px 36px}.periodBar.periodBarStack{padding:15px}.periodTopActions{width:100%;display:grid;grid-template-columns:1fr}.statsMode{width:100%}.statsMode button{flex:1;min-width:0}.reportBtn{width:100%}.filters label{width:100%}.filters select{flex:1}.filters button{flex:1}.cards{gap:10px}.cards>div{min-height:124px;padding:17px}.profitReportModal{border-radius:0}.modalBack.printReportBack{padding:0}.profitReportHeader{padding:18px 48px 14px 16px}.profitReportActions{display:flex;margin-top:12px}.reportMeta,.reportKpiGrid{margin-left:12px;margin-right:12px;grid-template-columns:1fr 1fr}.reportSection{margin-left:12px;margin-right:12px}.reportCostGrid{grid-template-columns:1fr 1fr}.reportCostGrid>div:nth-child(2){border-right:0}.reportCostGrid>div:nth-child(-n+2){border-bottom:1px solid #edf1f5}}
+@media(max-width:500px){.reportMeta,.reportKpiGrid,.reportCostGrid{grid-template-columns:1fr}.reportKpiGrid>div,.reportCostGrid>div{border-right:0!important;border-bottom:1px solid #e8edf2}.reportKpiGrid>div:last-child,.reportCostGrid>div:last-child{border-bottom:0}.profitReportActions{flex-direction:column}.profitReportActions button{width:100%}}
+
+@media print{
+  .profitReportHeader{position:static!important;padding:0 0 10px!important}.reportMeta,.reportKpiGrid,.reportSection{margin-left:0!important;margin-right:0!important}.reportTableWrap{max-height:none!important;overflow:visible!important}
+}
