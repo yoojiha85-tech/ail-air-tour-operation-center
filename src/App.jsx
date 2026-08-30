@@ -329,6 +329,34 @@ export default function App(){
     return {rows:rr,count:rr.length,people:rr.reduce((a,r)=>a+num(r.traveler_count),0),contractSale,fxAdjustment,finalSale,paid,expense,profit,balance:finalSale-paid,margin:finalSale?profit/finalSale*100:0,airCost,hotelCost,landCost,otherCost}
   },[periodRows,payMap,expMap,expenses])
 
+  const dashboardAnalytics=useMemo(()=>{
+    const rr=periodRows
+    const monthMap=Array.from({length:12},(_,i)=>({month:i+1,sale:0,paid:0,profit:0,count:0}))
+    rr.forEach(r=>{
+      const m=Number(String(r.departure_date||'').slice(5,7))
+      if(!m||!monthMap[m-1])return
+      const sale=num(r.final_sale_amount||r.sale_amount)
+      const paid=num(payMap[r.id])
+      const expense=num(expMap[r.id])
+      monthMap[m-1].sale+=sale; monthMap[m-1].paid+=paid; monthMap[m-1].profit+=sale-expense; monthMap[m-1].count+=1
+    })
+    const visibleMonths=monthMap.filter(x=>x.count>0 || period==='year')
+    const productKeys=['honeymoon','package','air','group']
+    const productMix=productKeys.map(k=>{const list=rr.filter(r=>r.product_type===k);return {key:k,label:TYPE[k],value:list.reduce((a,r)=>a+num(r.final_sale_amount||r.sale_amount),0),count:list.length}}).filter(x=>x.count>0)
+    const groupTop=(keyFn)=>{
+      const map=new Map()
+      rr.forEach(r=>{const k=(keyFn(r)||'미지정').trim?.()||'미지정';const sale=num(r.final_sale_amount||r.sale_amount);map.set(k,(map.get(k)||0)+sale)})
+      return [...map.entries()].map(([label,value])=>({label,value})).sort((a,b)=>b.value-a.value).slice(0,5)
+    }
+    const destinationTop=groupTop(r=>r.destination||r.title||'미지정')
+    const managerTop=groupTop(r=>r.manager_name||'담당 미지정')
+    const finalSale=rr.reduce((a,r)=>a+num(r.final_sale_amount||r.sale_amount),0)
+    const paid=rr.reduce((a,r)=>a+num(payMap[r.id]),0)
+    const receivable=rr.reduce((a,r)=>a+Math.max(0,num(r.final_sale_amount||r.sale_amount)-num(payMap[r.id])),0)
+    const overpaid=rr.reduce((a,r)=>a+Math.max(0,num(payMap[r.id])-num(r.final_sale_amount||r.sale_amount)),0)
+    return {months:visibleMonths,productMix,destinationTop,managerTop,finalSale,paid,receivable,overpaid,paymentRate:finalSale?paid/finalSale*100:0}
+  },[periodRows,payMap,expMap,period,year])
+
   function reportScopeLabel(){return page==='dashboard'?'전체 예약':`${TYPE[page]} 예약`}
   function reportPeriodLabel(){
     if(period==='year')return `${year}년 전체`
@@ -1017,6 +1045,31 @@ export default function App(){
             </div>
           </details>
         </section>}
+
+        <section className="dashboardVisuals" aria-label="선택 기간 통계 그래프">
+          <article className="vizCard vizWide">
+            <div className="vizHead"><div><h3>월별 추이</h3><p>출발일 기준 · 매출 / 입금 / 예상 순이익</p></div><span>{reportPeriodLabel()}</span></div>
+            <div className="trendLegend"><span className="sale">매출</span><span className="paid">입금</span><span className="profit">예상 순이익</span></div>
+            <div className="trendChart">{dashboardAnalytics.months.map(m=>{const max=Math.max(1,...dashboardAnalytics.months.flatMap(x=>[x.sale,x.paid,Math.max(0,x.profit)]));return <div className="trendCol" key={`trend-${m.month}`} title={`${m.month}월 · 매출 ${won(m.sale)} · 입금 ${won(m.paid)} · 순이익 ${won(m.profit)}`}><div className="trendBars"><i className="barSale" style={{height:`${Math.max(3,m.sale/max*100)}%`}}/><i className="barPaid" style={{height:`${Math.max(3,m.paid/max*100)}%`}}/><i className="barProfit" style={{height:`${Math.max(3,Math.max(0,m.profit)/max*100)}%`}}/></div><b>{m.month}월</b></div>})}</div>
+          </article>
+          <article className="vizCard">
+            <div className="vizHead"><div><h3>{page==='dashboard'?'상품별 매출 비중':'지역·상품 매출 비중'}</h3><p>{page==='dashboard'?'전체 상품 구성':'선택 현황의 상위 지역 구성'}</p></div></div>
+            {(()=>{const mix=page==='dashboard'?dashboardAnalytics.productMix:dashboardAnalytics.destinationTop;const total=mix.reduce((a,x)=>a+x.value,0);let cursor=0;const palette=['#2f6bd8','#24a36f','#ef9b2d','#8b6ad9','#55a6c9'];const stops=mix.map((x,i)=>{const start=cursor;cursor+=total?x.value/total*100:0;return `${palette[i%palette.length]} ${start}% ${cursor}%`}).join(',');return <div className="donutWrap"><div className="donut" style={{background:total?`conic-gradient(${stops})`:'#edf2f7'}}><div><small>총 매출</small><b>{won(total)}</b></div></div><div className="donutLegend">{mix.slice(0,5).map((x,i)=><div key={`mix-${x.label}`}><i style={{background:palette[i%palette.length]}}/><span>{x.label}</span><b>{total?`${(x.value/total*100).toFixed(1)}%`:'0%'}</b><small>{won(x.value)}</small></div>)}</div></div>})()}
+          </article>
+          <article className="vizCard">
+            <div className="vizHead"><div><h3>지역별 매출 TOP 5</h3><p>선택 기간 최종 매출 기준</p></div></div>
+            <div className="rankBars">{dashboardAnalytics.destinationTop.map((x,i)=>{const max=dashboardAnalytics.destinationTop[0]?.value||1;return <div key={`dest-${x.label}`}><span>{x.label}</span><div><i style={{width:`${x.value/max*100}%`}}/></div><b>{won(x.value)}</b></div>})}</div>
+          </article>
+          <article className="vizCard">
+            <div className="vizHead"><div><h3>담당자별 매출 현황</h3><p>예약 담당자 기준</p></div></div>
+            <div className="rankBars managerBars">{dashboardAnalytics.managerTop.map((x,i)=>{const max=dashboardAnalytics.managerTop[0]?.value||1;return <div key={`mgr-${x.label}`}><span>{x.label}</span><div><i style={{width:`${x.value/max*100}%`}}/></div><b>{won(x.value)}</b></div>})}</div>
+          </article>
+          <article className="vizCard paymentViz">
+            <div className="vizHead"><div><h3>입금 현황</h3><p>선택 예약의 누적 입금 기준</p></div></div>
+            <div className="paymentGauge" style={{'--rate':`${Math.min(100,Math.max(0,dashboardAnalytics.paymentRate))}%`}}><div><strong>{dashboardAnalytics.paymentRate.toFixed(1)}%</strong><small>입금률</small></div></div>
+            <div className="paymentLegend"><div><i className="paid"/><span>누적 입금</span><b>{won(dashboardAnalytics.paid)}</b></div><div><i className="due"/><span>미수금</span><b>{won(dashboardAnalytics.receivable)}</b></div><div><i className="over"/><span>초과 입금</span><b>{won(dashboardAnalytics.overpaid)}</b></div></div>
+          </article>
+        </section>
       </>}
 
       {page==='dashboard'&&<>
