@@ -39,6 +39,13 @@ const monthLabel=m=>`${m}월`
 const methodLabel={transfer:'입금',card:'카드',cash:'현금',mixed:'혼합'}
 const roleLabel={master:'마스터',manager:'관리자',staff:'직원',viewer:'조회전용'}
 const has=(m,k)=>m?.role==='master'||m?.permissions?.[k]===true
+const dayDiff=(from,to)=>{const a=new Date(from),b=new Date(to);if(Number.isNaN(a.getTime())||Number.isNaN(b.getTime()))return null;a.setHours(0,0,0,0);b.setHours(0,0,0,0);return Math.ceil((b-a)/86400000)}
+const passportStatus=r=>{if(r.passport_copy_received)return {label:'수령완료',tone:'ok'};const d=dayDiff(new Date(),r.departure_date);if(d===null)return {label:'확인대기',tone:'muted'};if(d<=30)return {label:d<0?'출발완료 미확인':'D-30 미수령',tone:'danger'};return {label:`D-${d}`,tone:'wait'}}
+const intermediateAirStatus=r=>{if(!r.intermediate_air_segment_exists)return {label:'해당없음',tone:'muted'};if(!r.intermediate_air_deposit_paid)return {label:'중도금 미결제',tone:'danger'};if(!r.intermediate_air_nonrefundable_notice_done)return {label:'환불불가 미안내',tone:'danger'};return {label:'안내·결제 완료',tone:'ok'}}
+const fxLabel={THB:'태국 바트 (THB)',USD:'미국 달러 (USD)',EUR:'유럽 유로 (EUR)'}
+const fxAdjustment=r=>Math.round((num(r?.balance_exchange_rate)-num(r?.contract_exchange_rate))*num(r?.fx_foreign_amount_per_person)*Math.max(1,num(r?.traveler_count)))
+const REMIT_STAGE={application:'신청금',interim:'중도금',balance:'잔금',additional:'추가송금'}
+const remittancePaid=e=>e?.status==='paid'||!!e?.paid_date
 
 function Login(){
   const [email,setEmail]=useState('')
@@ -66,6 +73,20 @@ export default function App(){
   const [payments,setPayments]=useState([])
   const [expenses,setExpenses]=useState([])
   const [members,setMembers]=useState([])
+  const [landContracts,setLandContracts]=useState([])
+  const [remitTemplates,setRemitTemplates]=useState([])
+  const [remitTemplateItems,setRemitTemplateItems]=useState([])
+  const [reservationChanges,setReservationChanges]=useState([])
+  const [landAnomalies,setLandAnomalies]=useState([])
+  const [landWorkflow,setLandWorkflow]=useState([])
+  const [landWorkQueue,setLandWorkQueue]=useState([])
+  const [staffWorkSummary,setStaffWorkSummary]=useState([])
+  const [staffWorkFilter,setStaffWorkFilter]=useState('')
+  const [landWorkHistory,setLandWorkHistory]=useState([])
+  const [todayWorkCenter,setTodayWorkCenter]=useState([])
+  const [todayWorkFilter,setTodayWorkFilter]=useState('urgent')
+  const [taskCompleteModal,setTaskCompleteModal]=useState(null)
+  const [workHistoryReservation,setWorkHistoryReservation]=useState(null)
   const [vi,setVi]=useState([])
   const [loading,setLoading]=useState(true)
   const [error,setError]=useState('')
@@ -76,6 +97,12 @@ export default function App(){
   const [calendarDate,setCalendarDate]=useState(new Date(2026,7,1))
   const [invite,setInvite]=useState({display_name:'',email:'',role:'staff',permissions:{...defaultPerms}})
   const [modal,setModal]=useState(null)
+  const [remitModal,setRemitModal]=useState(null)
+  const [contractModal,setContractModal]=useState(null)
+  const [templateModal,setTemplateModal]=useState(null)
+  const [templateManagerOpen,setTemplateManagerOpen]=useState(false)
+  const [historyReservation,setHistoryReservation]=useState(null)
+  const [taskAssignModal,setTaskAssignModal]=useState(null)
 
   useEffect(()=>{
     supabase.auth.getSession().then(({data})=>{setSession(data.session);setLoading(false)})
@@ -93,21 +120,31 @@ export default function App(){
   }
   async function loadAll(){
     setLoading(true);setError('')
-    const [r,p,e,m,v]=await Promise.all([
-      supabase.from('ops_reservations').select('*').eq('organization_id',ORG).order('departure_date',{ascending:true}),
+    const [r,p,e,m,c,t,ti,ch,a,w,q,sw,wh,tw,v]=await Promise.all([
+      supabase.from('ops_dashboard_reservations').select('*').eq('organization_id',ORG).order('departure_date',{ascending:true}),
       supabase.from('ops_payments').select('*').eq('organization_id',ORG),
       supabase.from('ops_expenses').select('*').eq('organization_id',ORG),
       supabase.from('ops_members').select('*').eq('organization_id',ORG).order('created_at'),
+      supabase.from('ops_land_contracts').select('*').eq('organization_id',ORG).order('created_at'),
+      supabase.from('ops_land_remittance_templates').select('*').eq('organization_id',ORG).order('vendor_name').order('template_name'),
+      supabase.from('ops_land_remittance_template_items').select('*').order('sort_order'),
+      supabase.from('ops_reservation_changes').select('*').eq('organization_id',ORG).in('entity_type',['land_contract','land_remittance']).order('changed_at',{ascending:false}).limit(1000),
+      supabase.from('ops_land_remittance_anomalies').select('*').eq('organization_id',ORG).order('departure_date',{ascending:true}),
+      supabase.from('ops_land_workflow_status').select('*').eq('organization_id',ORG).order('departure_date',{ascending:true}),
+      supabase.from('ops_land_work_queue').select('*').eq('organization_id',ORG).order('departure_date',{ascending:true}),
+      supabase.from('ops_staff_land_work_summary').select('*').eq('organization_id',ORG).order('display_name',{ascending:true}),
+      supabase.from('ops_land_work_history').select('*').eq('organization_id',ORG).order('created_at',{ascending:false}).limit(1500),
+      supabase.from('ops_today_work_center').select('*').eq('organization_id',ORG).order('priority_rank',{ascending:true}).order('due_date',{ascending:true}),
       supabase.from('ops_air_vi_monthly').select('*').eq('organization_id',ORG).order('year').order('month')
     ])
-    const er=r.error||p.error||e.error||m.error||v.error
+    const er=r.error||p.error||e.error||m.error||c.error||t.error||ti.error||ch.error||a.error||w.error||q.error||sw.error||wh.error||tw.error||v.error
     if(er)setError(er.message)
-    setRows(r.data||[]);setPayments(p.data||[]);setExpenses(e.data||[]);setMembers(m.data||[]);setVi(v.data||[])
+    setRows(r.data||[]);setPayments(p.data||[]);setExpenses(e.data||[]);setMembers(m.data||[]);setLandContracts(c.data||[]);setRemitTemplates(t.data||[]);setRemitTemplateItems(ti.data||[]);setReservationChanges(ch.data||[]);setLandAnomalies(a.data||[]);setLandWorkflow(w.data||[]);setLandWorkQueue(q.data||[]);setStaffWorkSummary(sw.data||[]);setLandWorkHistory(wh.data||[]);setTodayWorkCenter(tw.data||[]);setVi(v.data||[])
     setLoading(false)
   }
 
-  const payMap=useMemo(()=>Object.fromEntries(rows.map(r=>[r.id,payments.filter(x=>x.reservation_id===r.id).reduce((a,b)=>a+num(b.amount),0)])),[rows,payments])
-  const expMap=useMemo(()=>Object.fromEntries(rows.map(r=>[r.id,expenses.filter(x=>x.reservation_id===r.id).reduce((a,b)=>a+num(b.amount_krw),0)])),[rows,expenses])
+  const payMap=useMemo(()=>Object.fromEntries(rows.map(r=>[r.id,num(r.paid_amount)])),[rows])
+  const expMap=useMemo(()=>Object.fromEntries(rows.map(r=>[r.id,num(r.expense_amount)])),[rows])
 
   function matchesPeriodDate(value){
     if(!value)return false
@@ -222,6 +259,408 @@ export default function App(){
     if(error)alert(error.message);else{alert('직원 사전 등록이 완료되었습니다.');setInvite({display_name:'',email:'',role:'staff',permissions:{...defaultPerms}})}
   }
 
+  const TODAY_WORK_LABEL={customer_balance:'고객 잔금',final_check:'최종체크',passport_copy:'여권사본',intermediate_air:'중간항공',land_work:'랜드사 업무'}
+  const todayWorkSummary=useMemo(()=>({
+    total:todayWorkCenter.length,
+    overdue:todayWorkCenter.filter(x=>x.timing_status==='overdue').length,
+    today:todayWorkCenter.filter(x=>x.timing_status==='today').length,
+    due3:todayWorkCenter.filter(x=>x.timing_status==='due_3d').length,
+    due7:todayWorkCenter.filter(x=>x.timing_status==='due_7d').length,
+    balance:todayWorkCenter.filter(x=>x.task_type==='customer_balance').length,
+    final:todayWorkCenter.filter(x=>x.task_type==='final_check').length,
+    passport:todayWorkCenter.filter(x=>x.task_type==='passport_copy').length,
+    land:todayWorkCenter.filter(x=>x.task_type==='land_work').length
+  }),[todayWorkCenter])
+  const visibleTodayWork=useMemo(()=>{
+    let list=[...todayWorkCenter]
+    if(todayWorkFilter==='urgent')list=list.filter(x=>['overdue','today','due_3d','due_7d'].includes(x.timing_status))
+    else if(todayWorkFilter!=='all')list=list.filter(x=>x.task_type===todayWorkFilter)
+    return list.sort((a,b)=>num(a.priority_rank)-num(b.priority_rank)||(String(a.due_date||'9999').localeCompare(String(b.due_date||'9999')))||(num(a.task_type_rank)-num(b.task_type_rank)))
+  },[todayWorkCenter,todayWorkFilter])
+  function todayWorkTone(x){return x.timing_status==='overdue'?'danger':x.timing_status==='today'?'today':x.timing_status==='due_3d'?'warn':x.timing_status==='due_7d'?'soon':'scheduled'}
+  function todayWorkTiming(x){
+    if(x.timing_status==='overdue')return `지연 ${Math.abs(dayDiff(new Date(),x.due_date))}일`
+    if(x.timing_status==='today')return '오늘'
+    if(x.due_date){const d=dayDiff(new Date(),x.due_date);return d>=0?`D-${d}`:ymd(x.due_date)}
+    return '확인필요'
+  }
+  function goToTodayWork(x){
+    if(x.task_type==='land_work'){goToLandAnomaly({reservation_id:x.reservation_id});return}
+    const r=rows.find(v=>v.id===x.reservation_id);if(!r)return
+    setPage(r.product_type||'honeymoon')
+    setTimeout(()=>openEdit(r),80)
+  }
+
+  const CHANGE_FIELD_LABEL={vendor_name:'거래처',currency:'통화',contract_foreign_amount:'계약 외화금액',contract_exchange_rate:'계약 환율',contract_amount_krw:'계약 원화금액',confirmed_date:'계약 확정일',remittance_template_id:'송금조건 템플릿',remittance_template_name_snapshot:'적용 템플릿',remittance_template_snapshot:'적용 송금조건',land_contract_id:'연결 계약',remittance_stage:'송금 단계',due_date:'송금 예정일',paid_date:'실제 송금일',foreign_amount:'송금 외화금액',exchange_rate:'송금 환율',amount_krw:'송금 원화금액',status:'송금 상태',note:'메모'}
+  function changeActor(userId){
+    if(!userId)return '시스템'
+    const m=members.find(x=>x.user_id===userId)
+    return m?.display_name||m?.name||m?.email||'직원'
+  }
+  function changesForReservation(reservationId){
+    return reservationChanges.filter(x=>x.reservation_id===reservationId)
+  }
+  function changeTitle(ch){
+    if(ch.action==='create')return ch.entity_type==='land_contract'?'랜드사 계약 등록':'랜드사 송금 등록'
+    if(ch.action==='delete')return ch.entity_type==='land_contract'?'랜드사 계약 삭제':'랜드사 송금 삭제'
+    return CHANGE_FIELD_LABEL[ch.field_name]||ch.field_name||'정보 변경'
+  }
+  function compactChangeValue(v){
+    if(v===null||v===undefined||v==='')return '-'
+    const text=String(v)
+    if(text.length>80)return `${text.slice(0,77)}…`
+    return text
+  }
+
+  function remittanceRows(reservationId){
+    return expenses.filter(e=>e.reservation_id===reservationId && e.expense_type==='land')
+  }
+
+  function reservationContracts(reservationId){
+    return landContracts.filter(c=>c.reservation_id===reservationId)
+  }
+
+  function remittanceSummary(r){
+    const list=remittanceRows(r.id)
+    const contracts=reservationContracts(r.id)
+    const contractTotal=contracts.reduce((a,c)=>a+num(c.contract_amount_krw),0)
+    const planned=list.reduce((a,e)=>a+num(e.amount_krw),0)
+    const paid=list.filter(remittancePaid).reduce((a,e)=>a+num(e.amount_krw),0)
+    const pending=Math.max(0,contractTotal-paid)
+    const unplanned=Math.max(0,contractTotal-planned)
+    const next=list.filter(e=>!remittancePaid(e)&&e.due_date).sort((a,b)=>String(a.due_date).localeCompare(String(b.due_date)))[0]
+    const stageDone=Object.fromEntries(Object.keys(REMIT_STAGE).map(k=>[k,list.some(e=>e.remittance_stage===k&&remittancePaid(e))]))
+    return {list,contracts,contractTotal,planned,paid,pending,unplanned,next,stageDone}
+  }
+
+  const landRemittanceTasks=useMemo(()=>{
+    const today=new Date();today.setHours(0,0,0,0)
+    const dueTasks=expenses.filter(e=>e.expense_type==='land'&&!remittancePaid(e)&&e.due_date).map(e=>{
+      const r=rows.find(x=>x.id===e.reservation_id)
+      const days=dayDiff(today,e.due_date)
+      if(!r||days===null||days>7)return null
+      return {
+        key:`expense-${e.id}`,kind:'due',reservation:r,expense:e,days,
+        priority:days<0?0:days<=3?1:2,
+        tone:days<0?'danger':days<=3?'urgent':'warn',
+        label:days<0?`기한 ${Math.abs(days)}일 경과`:days===0?'오늘 송금':`D-${days}`,
+        title:`${REMIT_STAGE[e.remittance_stage]||'랜드사 송금'} ${won(e.amount_krw)}`,
+        vendor:e.vendor_name||r.partner_name||'랜드사 미지정'
+      }
+    }).filter(Boolean)
+    const planTasks=rows.map(r=>{
+      const d=dayDiff(today,r.departure_date)
+      if(d===null||d<0||d>30)return null
+      const sm=remittanceSummary(r)
+      if(sm.contractTotal<=0||sm.unplanned<=0)return null
+      return {
+        key:`plan-${r.id}`,kind:'plan',reservation:r,days:d,priority:3,tone:'info',
+        label:`출발 D-${d}`,title:`송금계획 미등록 ${won(sm.unplanned)}`,
+        vendor:sm.contracts.map(c=>c.vendor_name).filter(Boolean).join(', ')||r.partner_name||'랜드사 미지정'
+      }
+    }).filter(Boolean)
+    return [...dueTasks,...planTasks].sort((a,b)=>a.priority-b.priority||a.days-b.days||String(a.reservation.departure_date||'').localeCompare(String(b.reservation.departure_date||'')))
+  },[expenses,rows,landContracts])
+
+
+  const LAND_WORKFLOW_LABEL={
+    contract_missing:'계약금액 등록',plan_missing:'송금계획 생성',application_pending:'신청금 송금',
+    interim_pending:'중도금 송금',balance_pending:'잔금 송금',remaining_balance:'미송금 잔액 확인',complete:'완료'
+  }
+  function workflowForReservation(reservationId){
+    return landWorkflow.find(x=>x.reservation_id===reservationId)||null
+  }
+  function workflowTone(step){
+    if(step==='complete')return 'ok'
+    if(step==='contract_missing'||step==='remaining_balance')return 'danger'
+    if(step==='plan_missing')return 'warn'
+    return 'wait'
+  }
+  function dueBasisLabel(basis){
+    return ({departure_d30:'출발 D-30',contract_confirmed:'계약 확정일',application_due:'신청금 예정일',interim_due:'중도금 예정일',balance_due:'잔금 예정일',next_remittance_due:'다음 송금 예정일',not_available:'자동기준 없음'})[basis]||''
+  }
+  const landChecklistTasks=useMemo(()=>{
+    const today=new Date();today.setHours(0,0,0,0)
+    return landWorkQueue.filter(w=>w.work_status!=='completed').map(w=>{
+      const days=dayDiff(today,w.departure_date)
+      const taskDays=w.task_due_date?dayDiff(today,w.task_due_date):null
+      const priority=w.task_timing_status==='overdue'?0:w.task_timing_status==='today'?1:w.task_timing_status==='due_3d'?2:days!==null&&days<=7?3:days!==null&&days<=30?4:5
+      return {...w,days,taskDays,priority,label:LAND_WORKFLOW_LABEL[w.current_step]||w.current_step}
+    }).filter(w=>w.days===null||w.days>=0).sort((a,b)=>a.priority-b.priority||(a.taskDays??9999)-(b.taskDays??9999)||(a.days??9999)-(b.days??9999))
+  },[landWorkQueue])
+
+  const landTaskBuckets=useMemo(()=>({
+    mine:landChecklistTasks.filter(x=>x.assignee_user_id===session?.user?.id),
+    overdue:landChecklistTasks.filter(x=>x.task_timing_status==='overdue'),
+    today:landChecklistTasks.filter(x=>x.task_timing_status==='today'),
+    due3:landChecklistTasks.filter(x=>x.task_timing_status==='due_3d'),
+    scheduled:landChecklistTasks.filter(x=>x.task_timing_status==='scheduled')
+  }),[landChecklistTasks,session?.user?.id])
+
+  const canViewAllStaffWork=member?.role==='master'||has(member,'staff_manage')
+  const effectiveStaffFilter=staffWorkFilter || (canViewAllStaffWork?'all':session?.user?.id||'')
+  const selectedStaffSummary=useMemo(()=>{
+    if(effectiveStaffFilter==='all'){
+      return staffWorkSummary.reduce((a,x)=>({
+        total_tasks:a.total_tasks+num(x.total_tasks),overdue_tasks:a.overdue_tasks+num(x.overdue_tasks),today_tasks:a.today_tasks+num(x.today_tasks),
+        week_tasks:a.week_tasks+num(x.week_tasks),departures_7d:a.departures_7d+num(x.departures_7d),departures_30d:a.departures_30d+num(x.departures_30d),
+        remittance_due_7d_amount:a.remittance_due_7d_amount+num(x.remittance_due_7d_amount)
+      }),{total_tasks:0,overdue_tasks:0,today_tasks:0,week_tasks:0,departures_7d:0,departures_30d:0,remittance_due_7d_amount:0})
+    }
+    const key=effectiveStaffFilter==='__unassigned__'?null:effectiveStaffFilter
+    return staffWorkSummary.find(x=>(x.user_id||null)===key)||{total_tasks:0,overdue_tasks:0,today_tasks:0,week_tasks:0,departures_7d:0,departures_30d:0,remittance_due_7d_amount:0}
+  },[staffWorkSummary,effectiveStaffFilter])
+  const selectedStaffTasks=useMemo(()=>{
+    if(effectiveStaffFilter==='all')return landChecklistTasks
+    if(effectiveStaffFilter==='__unassigned__')return landChecklistTasks.filter(x=>!x.assignee_user_id)
+    return landChecklistTasks.filter(x=>x.assignee_user_id===effectiveStaffFilter)
+  },[landChecklistTasks,effectiveStaffFilter])
+
+  const completedWorkItems=useMemo(()=>landWorkHistory.filter(h=>h.action==='complete'),[landWorkHistory])
+  const completedTodayCount=useMemo(()=>{const d=new Date().toISOString().slice(0,10);return completedWorkItems.filter(h=>String(h.created_at||'').slice(0,10)===d).length},[completedWorkItems])
+  const completedWeekCount=useMemo(()=>{const now=Date.now();return completedWorkItems.filter(h=>{const t=new Date(h.created_at).getTime();return Number.isFinite(t)&&t>=now-7*86400000}).length},[completedWorkItems])
+  function workHistoryForReservation(reservationId){return landWorkHistory.filter(h=>h.reservation_id===reservationId)}
+  function openTaskComplete(w){
+    if(!has(member,'expense_manage'))return
+    setTaskCompleteModal({assignment_id:w.assignment_id,reservation_id:w.reservation_id,reservation_code:w.reservation_code,customer_name:w.customer_name,workflow_step:w.current_step,completion_note:''})
+  }
+  async function completeLandTask(e){
+    e.preventDefault()
+    if(!taskCompleteModal?.assignment_id)return alert('업무 배정정보를 확인할 수 없습니다.')
+    const {error}=await supabase.from('ops_land_work_assignments').update({work_status:'completed',completed_by:session.user.id,completed_at:new Date().toISOString(),completion_note:taskCompleteModal.completion_note||null,updated_at:new Date().toISOString()}).eq('organization_id',ORG).eq('id',taskCompleteModal.assignment_id)
+    if(error)return alert(error.message)
+    setTaskCompleteModal(null);await loadAll()
+  }
+  async function reopenLandTask(h){
+    if(!has(member,'expense_manage')||!h.assignment_id)return
+    if(!confirm('이 업무를 다시 미완료 상태로 전환할까요?'))return
+    const {error}=await supabase.from('ops_land_work_assignments').update({work_status:'open',completed_by:null,completed_at:null,completion_note:null,updated_at:new Date().toISOString()}).eq('organization_id',ORG).eq('id',h.assignment_id)
+    if(error)return alert(error.message)
+    await loadAll()
+  }
+
+  function openTaskAssignment(w){
+    if(!has(member,'expense_manage'))return
+    setTaskAssignModal({reservation_id:w.reservation_id,reservation_code:w.reservation_code,customer_name:w.customer_name,workflow_step:w.current_step,assignee_user_id:w.assignee_user_id||'',due_date:w.task_due_date||w.next_due_date||'',note:w.task_note||'',due_date_source:w.due_date_source||'auto',due_date_basis:w.due_date_basis||''})
+  }
+
+  async function saveTaskAssignment(e){
+    e.preventDefault()
+    const payload={organization_id:ORG,reservation_id:taskAssignModal.reservation_id,workflow_step:taskAssignModal.workflow_step,assignee_user_id:taskAssignModal.assignee_user_id||null,due_date:taskAssignModal.due_date||null,note:taskAssignModal.note||null,created_by:session.user.id,assignment_source:'manual',due_date_source:'manual',updated_at:new Date().toISOString()}
+    const {error}=await supabase.from('ops_land_work_assignments').upsert(payload,{onConflict:'organization_id,reservation_id,workflow_step'})
+    if(error){alert(error.message);return}
+    setTaskAssignModal(null);await loadAll()
+  }
+
+  const LAND_ANOMALY_LABEL={
+    overpaid_contract:'계약액 초과 송금',
+    balance_paid_but_remaining:'잔금 후 미송금 잔액',
+    planned_over_contract:'송금계획 계약액 초과',
+    contract_fx_missing:'계약 환율 누락',
+    remittance_fx_missing:'송금 환율 누락',
+    remittance_overdue:'송금기한 경과',
+    contract_missing_near_departure:'출발임박 계약 미등록'
+  }
+  const landAnomalySummary=useMemo(()=>({
+    danger:landAnomalies.filter(x=>x.severity==='danger').length,
+    warning:landAnomalies.filter(x=>x.severity!=='danger').length
+  }),[landAnomalies])
+
+  function goToLandAnomaly(issue){
+    const r=rows.find(x=>x.id===issue.reservation_id)
+    if(!r)return
+    const type=r.product_type
+    if(type&&TYPE[type])setPage(type)
+    setTimeout(()=>{
+      const el=document.getElementById(`remit-${r.id}`)
+      el?.scrollIntoView({behavior:'smooth',block:'center'})
+      if(el){el.classList.add('validationFocus');setTimeout(()=>el.classList.remove('validationFocus'),2200)}
+    },120)
+  }
+
+  function goToLandRemittance(task){
+    const type=task?.reservation?.product_type
+    if(type&&TYPE[type])setPage(type)
+    setTimeout(()=>document.getElementById(`remit-${task.reservation.id}`)?.scrollIntoView({behavior:'smooth',block:'center'}),120)
+  }
+
+  function openContract(r){
+    if(!has(member,'expense_manage'))return
+    setContractModal({reservation_id:r.id,reservation_code:r.reservation_code,customer_name:r.customer_name,vendor_name:r.partner_name||'',currency:'USD',contract_foreign_amount:'',contract_exchange_rate:'',contract_amount_krw:'',confirmed_date:'',note:''})
+  }
+
+  function templatesForVendor(vendor){
+    const name=String(vendor||'').trim()
+    return remitTemplates.filter(t=>t.is_active!==false && (!name || t.vendor_name===name))
+  }
+
+  function shiftDate(base,days){
+    if(!base)return null
+    const d=new Date(`${base}T00:00:00`)
+    if(Number.isNaN(d.getTime()))return null
+    d.setDate(d.getDate()+Number(days||0))
+    return d.toISOString().slice(0,10)
+  }
+
+  async function createRemittancePlan(contract,reservation,templateId){
+    if(!templateId)return
+    const items=remitTemplateItems.filter(i=>i.template_id===templateId).sort((a,b)=>num(a.sort_order)-num(b.sort_order))
+    if(!items.length)return
+    const baseAmount=num(contract.contract_amount_krw)
+    const plan=items.map(i=>{
+      const amount=i.calc_type==='fixed_krw'?num(i.calc_value):Math.round(baseAmount*num(i.calc_value)/100)
+      const base=i.due_basis==='contract'?(contract.confirmed_date||new Date().toISOString().slice(0,10)):reservation.departure_date
+      return {organization_id:ORG,reservation_id:contract.reservation_id,vendor_name:contract.vendor_name,expense_type:'land',land_contract_id:contract.id,remittance_stage:i.remittance_stage,due_date:shiftDate(base,i.due_offset_days),currency:'KRW',amount_krw:amount,status:'pending',note:'랜드사 송금조건 템플릿 자동생성',created_by:session.user.id}
+    }).filter(x=>x.amount_krw>0)
+    if(plan.length){
+      const {error}=await supabase.from('ops_expenses').insert(plan)
+      if(error)throw error
+    }
+  }
+
+  function blankTemplateForm(extra={}){
+    return {id:null,vendor_name:'',template_name:'기본 송금조건',application_percent:'',application_days:'0',interim_percent:'',interim_days:'',balance_percent:'',balance_days:'',note:'',...extra}
+  }
+
+  function templateFormFrom(t,{copy=false}={}){
+    const items=remitTemplateItems.filter(i=>i.template_id===t.id)
+    const byStage=Object.fromEntries(items.map(i=>[i.remittance_stage,i]))
+    const app=byStage.application, interim=byStage.interim, balance=byStage.balance
+    return blankTemplateForm({
+      id:copy?null:t.id,
+      vendor_name:t.vendor_name||'',
+      template_name:copy?`${t.template_name} 복사본`:t.template_name||'기본 송금조건',
+      application_percent:app?.calc_type==='percent'?String(app.calc_value):'',
+      application_days:app?String(Math.max(0,num(app.due_offset_days))):'0',
+      interim_percent:interim?.calc_type==='percent'?String(interim.calc_value):'',
+      interim_days:interim?String(Math.abs(num(interim.due_offset_days))):'',
+      balance_percent:balance?.calc_type==='percent'?String(balance.calc_value):'',
+      balance_days:balance?String(Math.abs(num(balance.due_offset_days))):'',
+      note:t.note||''
+    })
+  }
+
+  function templateUsageCount(templateId){
+    return landContracts.filter(c=>c.remittance_template_id===templateId).length
+  }
+
+  function openTemplateManager(){
+    if(!has(member,'expense_manage'))return
+    setTemplateManagerOpen(true)
+  }
+
+  function openNewTemplate(){ setTemplateModal(blankTemplateForm()) }
+  function editTemplate(t){ setTemplateModal(templateFormFrom(t)) }
+  function copyTemplate(t){ setTemplateModal(templateFormFrom(t,{copy:true})) }
+
+  async function toggleTemplateActive(t){
+    if(!has(member,'expense_manage'))return
+    const {error}=await supabase.from('ops_land_remittance_templates').update({is_active:t.is_active===false,updated_at:new Date().toISOString()}).eq('organization_id',ORG).eq('id',t.id)
+    if(error)return alert(error.message)
+    await loadAll()
+  }
+
+  async function saveRemittanceTemplate(){
+    if(!templateModal||!has(member,'expense_manage'))return
+    const vendor=String(templateModal.vendor_name||'').trim()
+    if(!vendor)return alert('거래처(랜드사)를 입력해 주세요.')
+    const stages=[
+      ['application',num(templateModal.application_percent),'contract',num(templateModal.application_days),1],
+      ['interim',num(templateModal.interim_percent),'departure',-Math.abs(num(templateModal.interim_days)),2],
+      ['balance',num(templateModal.balance_percent),'departure',-Math.abs(num(templateModal.balance_days)),3]
+    ].filter(x=>x[1]>0)
+    const total=stages.reduce((a,x)=>a+x[1],0)
+    if(!stages.length)return alert('신청금·중도금·잔금 중 하나 이상의 비율을 입력해 주세요.')
+    if(total>100)return alert('송금 비율 합계는 100%를 초과할 수 없습니다.')
+    const templatePayload={vendor_name:vendor,template_name:String(templateModal.template_name||'기본 송금조건').trim(),note:templateModal.note||null,updated_at:new Date().toISOString()}
+    let t
+    if(templateModal.id){
+      const {data,error}=await supabase.from('ops_land_remittance_templates').update(templatePayload).eq('organization_id',ORG).eq('id',templateModal.id).select().single()
+      if(error)return alert(error.message)
+      t=data
+      const {error:delError}=await supabase.from('ops_land_remittance_template_items').delete().eq('template_id',t.id)
+      if(delError)return alert(delError.message)
+    }else{
+      const {data,error}=await supabase.from('ops_land_remittance_templates').insert({organization_id:ORG,...templatePayload,created_by:session.user.id}).select().single()
+      if(error)return alert(error.message)
+      t=data
+    }
+    const items=stages.map(([stage,value,basis,offset,order])=>({template_id:t.id,remittance_stage:stage,calc_type:'percent',calc_value:value,due_basis:basis,due_offset_days:offset,sort_order:order}))
+    const {error:itemError}=await supabase.from('ops_land_remittance_template_items').insert(items)
+    if(itemError)return alert(itemError.message)
+    setTemplateModal(null);await loadAll()
+  }
+
+  async function saveContract(){
+    if(!contractModal||!has(member,'expense_manage'))return
+    if(!String(contractModal.vendor_name||'').trim())return alert('거래처(랜드사)를 입력해 주세요.')
+    const foreign=num(contractModal.contract_foreign_amount), rate=num(contractModal.contract_exchange_rate)
+    const krw=num(contractModal.contract_amount_krw)||(foreign&&rate?Math.round(foreign*rate):0)
+    if(krw<=0)return alert('랜드사 총 계약금액을 입력해 주세요.')
+    const selectedTemplate=contractModal.template_id?remitTemplates.find(t=>t.id===contractModal.template_id):null
+    const selectedItems=selectedTemplate?remitTemplateItems.filter(i=>i.template_id===selectedTemplate.id).sort((a,b)=>num(a.sort_order)-num(b.sort_order)):[]
+    const templateSnapshot=selectedTemplate?{template_id:selectedTemplate.id,vendor_name:selectedTemplate.vendor_name,template_name:selectedTemplate.template_name,items:selectedItems.map(i=>({remittance_stage:i.remittance_stage,calc_type:i.calc_type,calc_value:num(i.calc_value),due_basis:i.due_basis,due_offset_days:num(i.due_offset_days),sort_order:num(i.sort_order)}))}:null
+    const payload={organization_id:ORG,reservation_id:contractModal.reservation_id,vendor_name:contractModal.vendor_name.trim(),currency:contractModal.currency||'KRW',contract_foreign_amount:foreign||0,contract_exchange_rate:rate||0,contract_amount_krw:krw,confirmed_date:contractModal.confirmed_date||null,note:contractModal.note||null,remittance_template_id:selectedTemplate?.id||null,remittance_template_name_snapshot:selectedTemplate?.template_name||null,remittance_template_snapshot:templateSnapshot,created_by:session.user.id}
+    const {data:contract,error}=await supabase.from('ops_land_contracts').insert(payload).select().single()
+    if(error)return alert(error.message)
+    try{
+      const reservation=rows.find(r=>r.id===contractModal.reservation_id)||{}
+      await createRemittancePlan(contract,reservation,contractModal.template_id)
+    }catch(planError){
+      alert(`계약금액은 저장됐지만 송금계획 자동생성에 실패했습니다: ${planError.message}`)
+    }
+    setContractModal(null);await loadAll()
+  }
+
+  async function deleteContract(c){
+    if(!has(member,'expense_manage')||!confirm(`${c.vendor_name} 계약금액을 삭제할까요?`))return
+    const {error}=await supabase.from('ops_land_contracts').delete().eq('organization_id',ORG).eq('id',c.id)
+    if(error)return alert(error.message)
+    await loadAll()
+  }
+
+  function openRemittance(r){
+    if(!has(member,'expense_manage'))return
+    setRemitModal({
+      reservation_id:r.id,
+      reservation_code:r.reservation_code,
+      customer_name:r.customer_name,
+      vendor_name:r.partner_name||'',
+      land_contract_id:reservationContracts(r.id).length===1?reservationContracts(r.id)[0].id:'',
+      remittance_stage:'application',
+      due_date:'',paid_date:'',currency:'USD',foreign_amount:'',exchange_rate:'',amount_krw:'',note:''
+    })
+  }
+
+  async function saveRemittance(){
+    if(!remitModal||!has(member,'expense_manage'))return
+    if(!String(remitModal.vendor_name||'').trim())return alert('거래처(랜드사)를 입력해 주세요.')
+    const foreign=num(remitModal.foreign_amount), rate=num(remitModal.exchange_rate)
+    const krw=num(remitModal.amount_krw)||(foreign&&rate?Math.round(foreign*rate):0)
+    if(krw<=0)return alert('송금 금액을 입력해 주세요.')
+    const payload={
+      organization_id:ORG,reservation_id:remitModal.reservation_id,
+      vendor_name:remitModal.vendor_name.trim(),expense_type:'land',
+      land_contract_id:remitModal.land_contract_id||null,remittance_stage:remitModal.remittance_stage,
+      due_date:remitModal.due_date||null,paid_date:remitModal.paid_date||null,
+      currency:remitModal.currency||'KRW',foreign_amount:foreign||null,
+      exchange_rate:rate||null,exchange_rate_date:remitModal.paid_date||remitModal.due_date||null,
+      amount_krw:krw,status:remitModal.paid_date?'paid':'pending',
+      note:remitModal.note||null,created_by:session.user.id
+    }
+    const {error}=await supabase.from('ops_expenses').insert(payload)
+    if(error)return alert(error.message)
+    setRemitModal(null);await loadAll()
+  }
+
+  async function markRemittancePaid(e){
+    if(!has(member,'expense_manage'))return
+    const today=new Date().toISOString().slice(0,10)
+    const {error}=await supabase.from('ops_expenses').update({status:'paid',paid_date:e.paid_date||today}).eq('organization_id',ORG).eq('id',e.id)
+    if(error)return alert(error.message)
+    await loadAll()
+  }
+
   function openCreate(productType){
     if(!has(member,'reservation_create'))return
     setModal({
@@ -232,7 +671,12 @@ export default function App(){
       title:'', destination:'', customer_name:'', customer_phone:'',
       partner_name:'', manager_name:member?.display_name||'',
       departure_date:'', return_date:'', traveler_count:2,
-      status:'confirmed', settlement_status:'unsettled', sale_amount:0, memo:''
+      status:'confirmed', settlement_status:'unsettled', sale_amount:0, memo:'',
+      passport_copy_received:false, passport_copy_received_at:'',
+      intermediate_air_segment_exists:false, intermediate_air_deposit_paid:false, intermediate_air_deposit_paid_at:'',
+      intermediate_air_nonrefundable_notice_done:false, intermediate_air_nonrefundable_notice_at:'',
+      fx_currency:'', contract_exchange_rate:'', balance_exchange_rate:'', fx_foreign_amount_per_person:'',
+      fx_notice_done:false, fx_notice_at:''
     })
   }
 
@@ -261,7 +705,20 @@ export default function App(){
       status:modal.status||'confirmed',
       settlement_status:modal.settlement_status||'unsettled',
       sale_amount:Math.max(0,num(modal.sale_amount)),
-      memo:modal.memo||null
+      memo:modal.memo||null,
+      passport_copy_received:!!modal.passport_copy_received,
+      passport_copy_received_at:modal.passport_copy_received ? (modal.passport_copy_received_at||new Date().toISOString().slice(0,10)) : null,
+      intermediate_air_segment_exists:!!modal.intermediate_air_segment_exists,
+      intermediate_air_deposit_paid:!!modal.intermediate_air_segment_exists&&!!modal.intermediate_air_deposit_paid,
+      intermediate_air_deposit_paid_at:(modal.intermediate_air_segment_exists&&modal.intermediate_air_deposit_paid)?(modal.intermediate_air_deposit_paid_at||new Date().toISOString().slice(0,10)):null,
+      intermediate_air_nonrefundable_notice_done:!!modal.intermediate_air_segment_exists&&!!modal.intermediate_air_nonrefundable_notice_done,
+      intermediate_air_nonrefundable_notice_at:(modal.intermediate_air_segment_exists&&modal.intermediate_air_nonrefundable_notice_done)?(modal.intermediate_air_nonrefundable_notice_at||new Date().toISOString().slice(0,10)):null,
+      fx_currency:modal.fx_currency||null,
+      contract_exchange_rate:modal.fx_currency?num(modal.contract_exchange_rate):null,
+      balance_exchange_rate:modal.fx_currency?num(modal.balance_exchange_rate):null,
+      fx_foreign_amount_per_person:modal.fx_currency?num(modal.fx_foreign_amount_per_person):null,
+      fx_notice_done:!!modal.fx_currency&&!!modal.fx_notice_done,
+      fx_notice_at:(modal.fx_currency&&modal.fx_notice_done)?(modal.fx_notice_at||new Date().toISOString().slice(0,10)):null
     }
     let q
     if(modal.mode==='edit'){
@@ -347,6 +804,36 @@ export default function App(){
       </>}
 
       {page==='dashboard'&&<>
+        <section className="panel masterTodayWorkCenter">
+          <div className="panelHead"><div><h2>오늘 업무센터</h2><p>고객 잔금·최종체크·여권·중간항공·랜드사 업무를 하나의 우선순위 큐로 관리합니다.</p></div><span className={`badge ${todayWorkSummary.overdue?'dangerBadge':''}`}>긴급·7일내 {todayWorkSummary.overdue+todayWorkSummary.today+todayWorkSummary.due3+todayWorkSummary.due7}건</span></div>
+          <div className="todayCenterStats"><div className={todayWorkSummary.overdue?'danger':''}><span>지연</span><b>{todayWorkSummary.overdue}</b></div><div><span>오늘</span><b>{todayWorkSummary.today}</b></div><div className={todayWorkSummary.due3?'warn':''}><span>D-3</span><b>{todayWorkSummary.due3}</b></div><div><span>D-7</span><b>{todayWorkSummary.due7}</b></div><div><span>잔금</span><b>{todayWorkSummary.balance}</b></div><div><span>최종체크</span><b>{todayWorkSummary.final}</b></div><div><span>여권</span><b>{todayWorkSummary.passport}</b></div><div><span>랜드사</span><b>{todayWorkSummary.land}</b></div></div>
+          <div className="todayCenterFilters">{[['urgent','긴급·7일내'],['all','전체'],['customer_balance','잔금'],['final_check','최종체크'],['passport_copy','여권'],['intermediate_air','중간항공'],['land_work','랜드사']].map(([k,l])=><button key={k} className={todayWorkFilter===k?'active':''} onClick={()=>setTodayWorkFilter(k)}>{l}</button>)}</div>
+          {visibleTodayWork.length===0?<div className="taskEmpty">선택한 조건의 업무가 없습니다.</div>:<div className="todayCenterList">{visibleTodayWork.slice(0,40).map((x,i)=><button key={`${x.task_type}-${x.reservation_id}-${i}`} className={`todayCenterRow ${todayWorkTone(x)}`} onClick={()=>goToTodayWork(x)}><span className="todayCenterFlag">{x.task_label||TODAY_WORK_LABEL[x.task_type]}</span><div><b>{x.customer_name} · {x.task_message}</b><small>{x.reservation_code} · {x.destination||x.product_type} · 출발 {ymd(x.departure_date)}{x.manager_name?` · 예약담당 ${x.manager_name}`:''}{x.assignee_name?` · 업무담당 ${x.assignee_name}`:''}{x.due_date?` · 처리기준 ${ymd(x.due_date)}`:''}</small></div><div className="todayCenterRight">{num(x.amount_krw)>0&&<small>{won(x.amount_krw)}</small>}<strong>{todayWorkTiming(x)} →</strong></div></button>)}</div>}
+          {visibleTodayWork.length>40&&<div className="todayCenterMore">상위 40건 표시 · 필터를 선택하면 업무 유형별로 확인할 수 있습니다.</div>}
+        </section>
+        {has(member,'expense_view')&&<section className="panel staffWorkDashboard">
+          <div className="panelHead"><div><h2>직원별 랜드사 업무 대시보드</h2><p>담당자별 오늘 업무·지연·이번 주·출발임박·예정 송금액을 한 화면에서 확인합니다.</p></div>{canViewAllStaffWork?<label className="staffWorkSelector">직원 선택<select value={effectiveStaffFilter} onChange={e=>setStaffWorkFilter(e.target.value)}><option value="all">전체 직원</option>{staffWorkSummary.filter(x=>x.user_id).map(x=><option key={x.user_id} value={x.user_id}>{x.display_name}</option>)}{staffWorkSummary.some(x=>!x.user_id)&&<option value="__unassigned__">담당 미지정</option>}</select></label>:<span className="badge">내 업무</span>}</div>
+          <div className="staffWorkStats"><div><span>현재 업무</span><b>{num(selectedStaffSummary.total_tasks)}</b></div><div className="ok"><span>오늘 완료</span><b>{completedTodayCount}</b></div><div><span>7일 완료</span><b>{completedWeekCount}</b></div><div className={num(selectedStaffSummary.overdue_tasks)?'danger':''}><span>지연</span><b>{num(selectedStaffSummary.overdue_tasks)}</b></div><div><span>오늘</span><b>{num(selectedStaffSummary.today_tasks)}</b></div><div><span>이번 주</span><b>{num(selectedStaffSummary.week_tasks)}</b></div><div><span>7일 내 출발</span><b>{num(selectedStaffSummary.departures_7d)}</b></div><div><span>30일 내 출발</span><b>{num(selectedStaffSummary.departures_30d)}</b></div><div className="money"><span>7일 내 송금예정</span><b>{won(selectedStaffSummary.remittance_due_7d_amount)}</b></div></div>
+          <div className="staffWorkTaskList">{selectedStaffTasks.length===0?<div className="taskEmpty">선택한 직원의 현재 랜드사 업무가 없습니다.</div>:selectedStaffTasks.slice(0,12).map(w=><div key={`staff-${w.reservation_id}`} className="staffWorkTaskRow"><button className={`staffWorkTask ${w.task_timing_status==='overdue'?'danger':w.task_timing_status==='today'?'today':''}`} onClick={()=>goToLandAnomaly({reservation_id:w.reservation_id})}><div><b>{w.customer_name} · {LAND_WORKFLOW_LABEL[w.current_step]||w.current_step}</b><small>{w.assignee_name||'담당 미지정'} · 출발 {ymd(w.departure_date)} · 처리 {ymd(w.task_due_date)}</small></div><strong>{w.task_timing_status==='overdue'?'지연':w.task_timing_status==='today'?'오늘':w.task_due_date?`D-${Math.max(0,dayDiff(new Date(),w.task_due_date))}`:'미지정'} →</strong></button>{has(member,'expense_manage')&&w.assignment_id&&<button className="taskDoneBtn" onClick={()=>openTaskComplete(w)}>처리완료</button>}</div>)}</div>
+          {canViewAllStaffWork&&<div className="staffCompareWrap"><h3>직원별 업무량 비교</h3><div className="tableWrap"><table><thead><tr><th>담당</th><th>현재업무</th><th>지연</th><th>오늘</th><th>이번 주</th><th>7일 내 출발</th><th>7일 내 송금예정</th></tr></thead><tbody>{staffWorkSummary.map(x=><tr key={x.user_id||'unassigned'}><td><b>{x.display_name}</b></td><td>{x.total_tasks}건</td><td className={num(x.overdue_tasks)?'textDanger':''}>{x.overdue_tasks}건</td><td>{x.today_tasks}건</td><td>{x.week_tasks}건</td><td>{x.departures_7d}건</td><td>{won(x.remittance_due_7d_amount)}</td></tr>)}</tbody></table></div></div>}
+          <div className="completedWorkPanel"><div className="completedWorkHead"><h3>최근 완료 업무</h3><span>최근 {Math.min(10,completedWorkItems.length)}건</span></div>{completedWorkItems.length===0?<div className="taskEmpty">아직 기록된 완료 업무가 없습니다.</div>:completedWorkItems.slice(0,10).map(h=>{const r=rows.find(x=>x.id===h.reservation_id);return <div className="completedWorkRow" key={h.id}><div><b>{r?.customer_name||r?.reservation_code||'예약'} · {LAND_WORKFLOW_LABEL[h.workflow_step]||h.workflow_step}</b><small>{changeActor(h.actor_user_id)} · {new Date(h.created_at).toLocaleString('ko-KR')} {h.note?`· ${h.note}`:''}</small></div><div className="completedActions"><span className="doneBadge">완료</span>{has(member,'expense_manage')&&<button className="secondary mini" onClick={()=>reopenLandTask(h)}>재오픈</button>}<button className="secondary mini" onClick={()=>setWorkHistoryReservation(h.reservation_id)}>이력</button></div></div>})}</div>
+        </section>}
+        {has(member,'expense_view')&&landChecklistTasks.length>0&&<section className="panel landChecklistPanel">
+          <div className="panelHead"><div><h2>랜드사 업무 체크리스트</h2><p>담당자와 처리 예정일을 기준으로 내 업무·오늘·지연 업무를 자동 분류합니다.</p></div><span className="badge">미완료 {landChecklistTasks.length}건</span></div>
+          <div className="landTaskSummary"><div><span>내 업무</span><b>{landTaskBuckets.mine.length}</b></div><div className={landTaskBuckets.overdue.length?'danger':''}><span>지연</span><b>{landTaskBuckets.overdue.length}</b></div><div><span>오늘 처리</span><b>{landTaskBuckets.today.length}</b></div><div className={landTaskBuckets.due3.length?'warn':''}><span>D-3 임박</span><b>{landTaskBuckets.due3.length}</b></div><div><span>예정</span><b>{landTaskBuckets.scheduled.length}</b></div></div>
+          <div className="landChecklistList">{landChecklistTasks.slice(0,30).map(w=><div key={w.reservation_id} className={`landChecklistRow ${workflowTone(w.current_step)} ${w.task_timing_status==='overdue'?'taskOverdue':''}`}><button className="landTaskMain" onClick={()=>goToLandAnomaly({reservation_id:w.reservation_id})}><span className="checklistStepNo">{w.current_step==='contract_missing'?'1':w.current_step==='plan_missing'?'2':w.current_step==='application_pending'?'3':w.current_step==='interim_pending'?'4':w.current_step==='balance_pending'?'5':'!'}</span><div><b>{w.customer_name} · {w.label}</b><small>{w.reservation_code} · 출발 {ymd(w.departure_date)} · 담당 {w.assignee_name||'미지정'}{w.assignee_name?` · ${w.assignment_source==='reservation_manager'?'자동배정':'수동배정'}`:''}{w.task_due_date?` · 처리 ${ymd(w.task_due_date)}`:''}{w.task_due_date&&w.due_date_source==='auto'?` · 자동(${dueBasisLabel(w.due_date_basis)})`:w.task_due_date?' · 수동':''}</small></div><strong>{w.task_timing_status==='overdue'?'지연':w.task_timing_status==='today'?'오늘':w.task_timing_status==='due_3d'?`업무 D-${w.taskDays}`:w.taskDays!==null?`업무 D-${w.taskDays}`:w.days!==null?`출발 D-${w.days}`:'확인'} →</strong></button>{has(member,'expense_manage')&&<div className="taskRowActions"><button className="taskAssignBtn" onClick={()=>openTaskAssignment(w)}>담당 지정</button>{w.assignment_id&&<button className="taskDoneBtn" onClick={()=>openTaskComplete(w)}>처리완료</button>}<button className="taskHistoryBtn" onClick={()=>setWorkHistoryReservation(w.reservation_id)}>이력</button></div>}</div>)}</div>
+        </section>}
+
+        {has(member,'expense_view')&&landAnomalies.length>0&&<section className="panel landValidationPanel">
+          <div className="panelHead"><div><h2>랜드사 송금 정산 이상 · 확인필요</h2><p>계약액·송금액·잔금·기한·환율을 자동 교차검증한 결과입니다.</p></div><div className="validationCounts"><span className="dangerBadge">긴급 {landAnomalySummary.danger}</span><span className="badge">확인필요 {landAnomalySummary.warning}</span></div></div>
+          <div className="validationList">{landAnomalies.slice(0,30).map((x,i)=><button key={`${x.issue_code}-${x.reservation_id}-${x.land_contract_id||i}`} className={`validationRow ${x.severity==='danger'?'danger':'warning'}`} onClick={()=>goToLandAnomaly(x)}><span className="validationFlag">{x.severity==='danger'?'긴급':'확인필요'}</span><div><b>{x.customer_name} · {LAND_ANOMALY_LABEL[x.issue_code]||x.issue_code}</b><small>{x.vendor_name||'랜드사 미지정'} · 출발 {ymd(x.departure_date)} · {x.issue_message}</small></div><strong>확인 →</strong></button>)}</div>
+        </section>}
+        {has(member,'expense_view')&&<section className="panel todayLandTasks">
+          <div className="panelHead"><div><h2>오늘 해야 할 랜드사 송금 업무</h2><p>신청금·중도금·잔금·추가송금 중 기한 7일 이내와 출발 30일 이내 송금계획 미등록 건을 자동 표시합니다.</p></div><span className={`badge ${landRemittanceTasks.some(t=>t.tone==='danger')?'dangerBadge':''}`}>{landRemittanceTasks.length}건</span></div>
+          {landRemittanceTasks.length===0?<div className="taskEmpty">현재 기한이 임박한 랜드사 송금 업무가 없습니다.</div>:<div className="todayTaskList">{landRemittanceTasks.slice(0,30).map(t=><button key={t.key} className={`todayTask ${t.tone}`} onClick={()=>goToLandRemittance(t)}>
+            <span className="taskFlag">{t.label}</span><div><b>{t.reservation.customer_name} · {t.title}</b><small>{t.vendor} · 출발 {ymd(t.reservation.departure_date)}</small></div><strong>송금관리 →</strong>
+          </button>)}</div>}
+        </section>}
         <section className="panel"><div className="panelHead"><div><h2>대시보드 기간 비교</h2><p>연도별 예약·매출 흐름</p></div></div>
           <div className="tableWrap"><table><thead><tr><th>확인 기간</th><th>예약/인원</th><th>매출</th><th>입금</th><th>지출</th><th>순이익</th></tr></thead>
           <tbody>{yearly.map(x=><tr key={x.y}><td><b>{x.y}년</b></td><td>{x.count}건 / {x.people}명</td><td>{won(x.sale)}</td><td>{won(x.paid)}</td><td>{won(x.expense)}</td><td className="profit">{won(x.profit)}</td></tr>)}</tbody></table></div>
@@ -362,9 +849,24 @@ export default function App(){
             <div className="uncat"><span>기타·미분류 원가</span><b>{won(expenses.filter(e=>productRows('honeymoon').some(r=>r.id===e.reservation_id)&&!['international_air','domestic_air','hotel','land'].includes(e.expense_type)).reduce((a,e)=>a+num(e.amount_krw),0))}</b><small>재분류 필요</small></div>
           </div></section>}
         <section className="panel"><div className="panelHead"><div><h2>{TYPE[page]} 예약내역</h2><p>선택 기간 예약 목록</p></div></div>
-          <div className="tableWrap"><table><thead><tr><th>예약번호</th><th>고객</th><th>상품/지역</th><th>출발일</th><th>인원</th><th>매출</th><th>입금</th><th>지출</th><th>순이익</th><th>관리</th></tr></thead>
-          <tbody>{productRows(page).map(r=><tr key={r.id}><td>{r.reservation_code}</td><td><b>{r.customer_name}</b></td><td>{r.title||r.destination}</td><td>{ymd(r.departure_date)}</td><td>{r.traveler_count}명</td><td>{won(r.sale_amount)}</td><td>{won(payMap[r.id])}</td><td>{won(expMap[r.id])}</td><td className="profit">{won(num(r.sale_amount)-num(expMap[r.id]))}</td><td><div className="actions">{has(member,'reservation_edit')&&<button onClick={()=>openEdit(r)}>수정</button>}{has(member,'reservation_delete')&&<button className="danger" onClick={()=>deleteReservation(r)}>삭제</button>}</div></td></tr>)}</tbody></table></div>
+          <div className="tableWrap"><table><thead><tr><th>예약번호</th><th>고객</th><th>상품/지역</th><th>출발일</th><th>인원</th><th>여권사본</th><th>중간항공</th><th>매출</th><th>입금</th><th>지출</th><th>순이익</th><th>관리</th></tr></thead>
+          <tbody>{productRows(page).map(r=>{const ps=passportStatus(r),ias=intermediateAirStatus(r);return <tr key={r.id}><td>{r.reservation_code}</td><td><b>{r.customer_name}</b></td><td>{r.title||r.destination}</td><td>{ymd(r.departure_date)}</td><td>{r.traveler_count}명</td><td><span className={`passportBadge ${ps.tone}`}>{ps.label}</span></td><td><span className={`passportBadge ${ias.tone}`}>{ias.label}</span></td><td>{won(r.sale_amount)}</td><td>{won(payMap[r.id])}</td><td>{won(expMap[r.id])}</td><td className="profit">{won(num(r.sale_amount)-num(expMap[r.id]))}</td><td><div className="actions">{has(member,'reservation_edit')&&<button onClick={()=>openEdit(r)}>수정</button>}{has(member,'reservation_delete')&&<button className="danger" onClick={()=>deleteReservation(r)}>삭제</button>}</div></td></tr>})}</tbody></table></div>
         </section>
+
+        {has(member,'expense_view')&&<section className="panel remittancePanel">
+          <div className="panelHead"><div><h2>거래처(랜드사) 송금 진행현황</h2><p>신청금 → 중도금 → 잔금 → 추가송금을 예약별로 분할 관리합니다.</p></div><div className="panelHeadActions">{has(member,'expense_manage')&&<button className="secondary" onClick={openTemplateManager}>송금조건 템플릿</button>}<span className="badge">{productRows(page).filter(r=>remittanceRows(r.id).length>0).length}건 송금등록</span></div></div>
+          <div className="remittanceList">{productRows(page).map(r=>{const sm=remittanceSummary(r);return <div className="remittanceCard" id={`remit-${r.id}`} key={`remit-${r.id}`}>
+            <div className="remittanceTop"><div><b>{r.customer_name}</b><small>{r.reservation_code} · {r.partner_name||'랜드사 미지정'} · 출발 {ymd(r.departure_date)}</small></div>{has(member,'expense_manage')&&<div className="remitActions"><button className="secondary" onClick={()=>setHistoryReservation(r)}>변경이력</button><button className="secondary" onClick={()=>openContract(r)}>+ 계약금액</button><button className="secondary" onClick={()=>openRemittance(r)}>+ 송금 등록</button></div>}</div>
+            {!has(member,'expense_manage')&&<div className="historyOnlyAction"><button className="secondary" onClick={()=>setHistoryReservation(r)}>변경이력</button></div>}
+            {(()=>{const wf=workflowForReservation(r.id);if(!wf)return null;const q=landWorkQueue.find(x=>x.reservation_id===r.id);const steps=[['contract','계약 등록',wf.contract_count>0],['plan','송금계획',wf.planned_count>0],['application','신청금',!wf.application_planned||wf.application_paid],['interim','중도금',!wf.interim_planned||wf.interim_paid],['balance','잔금',!wf.balance_planned||wf.balance_paid]];return <div className="landWorkflowBox"><div className="workflowHead"><div><b>랜드사 업무 진행</b>{q&&<small className="workflowAssignee">담당 {q.assignee_name||'미지정'}{q.assignee_name?` · ${q.assignment_source==='reservation_manager'?'자동배정':'수동배정'}`:''}{q.task_due_date?` · 처리 ${ymd(q.task_due_date)}`:''}{q.task_due_date&&q.due_date_source==='auto'?` · 자동(${dueBasisLabel(q.due_date_basis)})`:q.task_due_date?' · 수동':''}</small>}</div><div className="workflowHeadActions"><span className={`passportBadge ${workflowTone(wf.current_step)}`}>{LAND_WORKFLOW_LABEL[wf.current_step]||wf.current_step}</span>{q&&has(member,'expense_manage')&&<><button className="secondary mini" onClick={()=>openTaskAssignment(q)}>담당 지정</button>{q.assignment_id&&<button className="secondary mini taskDoneMini" onClick={()=>openTaskComplete(q)}>처리완료</button>}<button className="secondary mini" onClick={()=>setWorkHistoryReservation(r.id)}>업무이력</button></>}</div></div><div className="workflowSteps">{steps.map(([key,label,done],idx)=><div key={key} className={`workflowStep ${done?'done':wf.current_step===({contract:'contract_missing',plan:'plan_missing',application:'application_pending',interim:'interim_pending',balance:'balance_pending'}[key])?'current':''}`}><span>{done?'✓':idx+1}</span><small>{label}</small></div>)}</div>{wf.remaining_amount>0&&<div className="workflowFoot"><span>남은 송금액</span><b>{won(wf.remaining_amount)}</b>{wf.next_due_date&&<small>다음 예정 {ymd(wf.next_due_date)}</small>}</div>}</div>})()}
+            <div className="remittanceMoney"><div><span>랜드사 총 계약액</span><b>{won(sm.contractTotal)}</b></div><div><span>송금 예정 등록</span><b>{won(sm.planned)}</b></div><div><span>누적 실제 송금</span><b>{won(sm.paid)}</b></div><div><span>실제 미송금 잔액</span><b className={sm.pending>0?'textWarn':''}>{won(sm.pending)}</b></div><div><span>미배정 계약액</span><b className={sm.unplanned>0?'textWarn':''}>{won(sm.unplanned)}</b></div><div><span>다음 예정일</span><b>{sm.next?ymd(sm.next.due_date):'-'}</b></div></div>
+            {sm.contracts.length>0&&<div className="contractRows">{sm.contracts.map(c=><div key={c.id}><span><b>{c.vendor_name}</b> · {c.currency}{num(c.contract_foreign_amount)>0?` ${num(c.contract_foreign_amount).toLocaleString()}`:''}</span><strong>{won(c.contract_amount_krw)}</strong><small>{c.confirmed_date?`계약확정 ${ymd(c.confirmed_date)}`:'계약일 미입력'}{c.remittance_template_name_snapshot?` · 템플릿 ${c.remittance_template_name_snapshot}`:''}</small>{has(member,'expense_manage')&&<button className="dangerMini" onClick={()=>deleteContract(c)}>삭제</button>}</div>)}</div>}
+            {sm.contracts.length===0&&<div className="contractEmpty">랜드사 총 계약액이 아직 등록되지 않았습니다. 송금 잔액을 정확히 계산하려면 계약금액을 먼저 등록하세요.</div>}
+            <div className="remittanceSteps">{Object.entries(REMIT_STAGE).map(([k,label])=>{const stageRows=sm.list.filter(e=>e.remittance_stage===k);const done=stageRows.some(remittancePaid);const pending=stageRows.find(e=>!remittancePaid(e));return <div className={`remitStep ${done?'done':stageRows.length?'pending':'empty'}`} key={k}><span>{done?'✓':stageRows.length?'!':'·'}</span><b>{label}</b><small>{stageRows.length?`${won(stageRows.reduce((a,e)=>a+num(e.amount_krw),0))}${pending?.due_date?` · ${ymd(pending.due_date)}`:''}`:'미등록'}</small></div>})}</div>
+            {sm.list.length>0&&<div className="remittanceRows">{sm.list.slice().sort((a,b)=>String(a.due_date||'9999').localeCompare(String(b.due_date||'9999'))).map(e=><div key={e.id}><span>{REMIT_STAGE[e.remittance_stage]||'미분류'} · {e.vendor_name}</span><b>{won(e.amount_krw)}</b><small>{remittancePaid(e)?`송금완료 ${ymd(e.paid_date)}`:`예정 ${ymd(e.due_date)}`}</small>{!remittancePaid(e)&&has(member,'expense_manage')&&<button onClick={()=>markRemittancePaid(e)}>송금완료</button>}</div>)}</div>}
+            {changesForReservation(r.id).length>0&&<div className="remitRecentHistory"><b>최근 변경</b>{changesForReservation(r.id).slice(0,3).map(ch=><span key={ch.id}>{new Date(ch.changed_at).toLocaleString('ko-KR')} · {changeActor(ch.changed_by)} · {changeTitle(ch)}</span>)}</div>}
+          </div>})}</div>
+        </section>}
       </>}
 
       {page==='calendar'&&<Calendar rows={rows} date={calendarDate} setDate={setCalendarDate}/>}
@@ -388,6 +890,55 @@ export default function App(){
       </section>}
     </main>
 
+    {taskCompleteModal&&<div className="modalBack"><form className="modalBox taskCompleteModal" onSubmit={completeLandTask}><button type="button" className="close" onClick={()=>setTaskCompleteModal(null)}><X/></button><h2>랜드사 업무 처리완료</h2><p className="modalIntro">{taskCompleteModal.customer_name} · {taskCompleteModal.reservation_code} · {LAND_WORKFLOW_LABEL[taskCompleteModal.workflow_step]}</p><div className="completionCaution">업무 처리완료는 직원 처리 기록입니다. 실제 계약·신청금·중도금·잔금 상태는 계약·송금 데이터가 변경될 때만 다음 단계로 이동합니다.</div><label>완료 메모<textarea value={taskCompleteModal.completion_note||''} onChange={e=>setTaskCompleteModal({...taskCompleteModal,completion_note:e.target.value})} placeholder="처리 내용·확인사항·인수인계 메모"/></label><div className="modalActions"><button type="button" className="secondary" onClick={()=>setTaskCompleteModal(null)}>취소</button><button type="submit"><Save size={16}/> 처리완료</button></div></form></div>}
+    {workHistoryReservation&&<div className="modalBack"><div className="modalBox workHistoryModal"><button type="button" className="close" onClick={()=>setWorkHistoryReservation(null)}><X/></button><h2>랜드사 업무 처리이력</h2><p className="modalIntro">{rows.find(r=>r.id===workHistoryReservation)?.customer_name||rows.find(r=>r.id===workHistoryReservation)?.reservation_code||'예약'}</p><div className="workHistoryList">{workHistoryForReservation(workHistoryReservation).length===0?<div className="taskEmpty">저장된 업무 처리이력이 없습니다.</div>:workHistoryForReservation(workHistoryReservation).map(h=><div className={`workHistoryItem ${h.action}`} key={h.id}><span className="historyDot"/><div><div className="workHistoryHead"><b>{h.action==='complete'?'처리완료':h.action==='reopen'?'재오픈':h.action==='create'?'업무 생성':'업무 수정'} · {LAND_WORKFLOW_LABEL[h.workflow_step]||h.workflow_step}</b><time>{new Date(h.created_at).toLocaleString('ko-KR')}</time></div><small>처리자 {changeActor(h.actor_user_id)}</small>{h.note&&<p>{h.note}</p>}</div></div>)}</div></div></div>}
+    {taskAssignModal&&<div className="modalBack"><form className="modalBox taskAssignModal" onSubmit={saveTaskAssignment}><button type="button" className="close" onClick={()=>setTaskAssignModal(null)}><X/></button><h2>랜드사 업무 담당 지정</h2><p className="modalIntro">{taskAssignModal.customer_name} · {taskAssignModal.reservation_code} · {LAND_WORKFLOW_LABEL[taskAssignModal.workflow_step]}</p>{taskAssignModal.due_date_source==='auto'&&<div className="autoDueHint">자동 예정일 · {dueBasisLabel(taskAssignModal.due_date_basis)||'업무 기준일'} 기준. 날짜를 수정해 저장하면 수동 예정일로 전환됩니다.</div>}<div className="formGrid"><label>담당 직원<select value={taskAssignModal.assignee_user_id||''} onChange={e=>setTaskAssignModal({...taskAssignModal,assignee_user_id:e.target.value})}><option value="">미지정</option>{members.filter(x=>x.active!==false).map(x=><option key={x.user_id} value={x.user_id}>{x.display_name||x.email} · {roleLabel[x.role]||x.role}</option>)}</select></label><label>처리 예정일<input type="date" value={taskAssignModal.due_date||''} onChange={e=>setTaskAssignModal({...taskAssignModal,due_date:e.target.value})}/></label><label className="wide">업무 메모<textarea value={taskAssignModal.note||''} onChange={e=>setTaskAssignModal({...taskAssignModal,note:e.target.value})} placeholder="인수인계·확인사항"/></label></div><div className="modalActions"><button type="button" className="secondary" onClick={()=>setTaskAssignModal(null)}>취소</button><button type="submit"><Save size={16}/> 저장</button></div></form></div>}
+
+    {historyReservation&&<div className="modalBack"><div className="modalBox historyModalBox"><button className="close" onClick={()=>setHistoryReservation(null)}><X/></button><h2>랜드사 계약·송금 변경이력</h2><p className="modalIntro">{historyReservation.customer_name} · {historyReservation.reservation_code}</p><div className="historyTimeline">{changesForReservation(historyReservation.id).length===0?<div className="emptyState">기록된 변경이력이 없습니다.</div>:changesForReservation(historyReservation.id).map(ch=><div className="historyItem" key={ch.id}><div className="historyDot"></div><div><div className="historyItemHead"><b>{changeTitle(ch)}</b><span>{new Date(ch.changed_at).toLocaleString('ko-KR')}</span></div><small>{changeActor(ch.changed_by)} · {ch.entity_type==='land_contract'?'랜드사 계약':'랜드사 송금'}</small>{ch.action==='update'&&<div className="historyDiff"><span>{compactChangeValue(ch.old_value)}</span><em>→</em><strong>{compactChangeValue(ch.new_value)}</strong></div>}{ch.action!=='update'&&<p>{ch.note||changeTitle(ch)}</p>}</div></div>)}</div></div></div>}
+
+    {templateManagerOpen&&<div className="modalBack"><div className="modalBox templateManagerBox"><button className="close" onClick={()=>setTemplateManagerOpen(false)}><X/></button><div className="templateManagerHead"><div><h2>랜드사 송금조건 템플릿 관리</h2><p className="modalIntro">등록된 조건을 수정·복사·사용중지할 수 있습니다. 과거 계약에는 적용 당시 조건이 스냅샷으로 보존됩니다.</p></div><button className="primary" onClick={openNewTemplate}>+ 새 템플릿</button></div>
+      <div className="templateManagerList">{remitTemplates.length===0?<div className="emptyState">등록된 송금조건 템플릿이 없습니다.</div>:remitTemplates.map(t=>{const items=remitTemplateItems.filter(i=>i.template_id===t.id).sort((a,b)=>num(a.sort_order)-num(b.sort_order));return <div className={`templateManagerRow ${t.is_active===false?'inactive':''}`} key={t.id}><div className="templateManagerMain"><div><b>{t.vendor_name}</b><strong>{t.template_name}</strong></div><span className={`passportBadge ${t.is_active===false?'muted':'ok'}`}>{t.is_active===false?'사용중지':'사용중'}</span></div><div className="templateConditionChips">{items.map(i=><span key={i.id}>{REMIT_STAGE[i.remittance_stage]||i.remittance_stage} {i.calc_type==='percent'?`${num(i.calc_value)}%`:won(i.calc_value)} · {i.due_basis==='contract'?`계약 후 ${Math.max(0,num(i.due_offset_days))}일`:`출발 ${Math.abs(num(i.due_offset_days))}일 전`}</span>)}</div><div className="templateManagerFoot"><small>적용 계약 {templateUsageCount(t.id)}건{t.note?` · ${t.note}`:''}</small><div><button onClick={()=>editTemplate(t)}>수정</button><button onClick={()=>copyTemplate(t)}>복사</button><button className={t.is_active===false?'':'dangerMini'} onClick={()=>toggleTemplateActive(t)}>{t.is_active===false?'사용재개':'사용중지'}</button></div></div></div>})}</div>
+    </div></div>}
+
+    {templateModal&&<div className="modalBack"><div className="modalBox reservationForm"><button className="close" onClick={()=>setTemplateModal(null)}><X/></button><h2>{templateModal.id?'랜드사 송금조건 수정':'랜드사 송금조건 등록'}</h2><p className="modalIntro">랜드사별 실제 송금조건을 저장합니다. 비율 합계가 100% 미만이면 나머지는 미배정 계약액으로 남습니다.</p>
+      <div className="modalGrid">
+        <label>거래처(랜드사)<input value={templateModal.vendor_name||''} onChange={e=>setTemplateModal({...templateModal,vendor_name:e.target.value})}/></label>
+        <label>템플릿명<input value={templateModal.template_name||''} onChange={e=>setTemplateModal({...templateModal,template_name:e.target.value})}/></label>
+        <div className="span2 templateStage"><b>신청금</b><label>계약액 대비 %<input type="number" min="0" max="100" step="0.1" value={templateModal.application_percent||''} onChange={e=>setTemplateModal({...templateModal,application_percent:e.target.value})}/></label><label>계약 확정 후 N일<input type="number" min="0" value={templateModal.application_days||'0'} onChange={e=>setTemplateModal({...templateModal,application_days:e.target.value})}/></label></div>
+        <div className="span2 templateStage"><b>중도금</b><label>계약액 대비 %<input type="number" min="0" max="100" step="0.1" value={templateModal.interim_percent||''} onChange={e=>setTemplateModal({...templateModal,interim_percent:e.target.value})}/></label><label>출발 N일 전<input type="number" min="0" value={templateModal.interim_days||''} onChange={e=>setTemplateModal({...templateModal,interim_days:e.target.value})}/></label></div>
+        <div className="span2 templateStage"><b>잔금</b><label>계약액 대비 %<input type="number" min="0" max="100" step="0.1" value={templateModal.balance_percent||''} onChange={e=>setTemplateModal({...templateModal,balance_percent:e.target.value})}/></label><label>출발 N일 전<input type="number" min="0" value={templateModal.balance_days||''} onChange={e=>setTemplateModal({...templateModal,balance_days:e.target.value})}/></label></div>
+        <label className="span2">비고<textarea rows="3" value={templateModal.note||''} onChange={e=>setTemplateModal({...templateModal,note:e.target.value})}/></label>
+      </div><div className="templateTotal">입력 비율 합계 <b>{num(templateModal.application_percent)+num(templateModal.interim_percent)+num(templateModal.balance_percent)}%</b></div><div className="modalActions"><button className="secondary" onClick={()=>setTemplateModal(null)}>취소</button><button className="primary" onClick={saveRemittanceTemplate}><Save size={16}/> 템플릿 저장</button></div>
+    </div></div>}
+
+    {contractModal&&<div className="modalBack"><div className="modalBox reservationForm"><button className="close" onClick={()=>setContractModal(null)}><X/></button><h2>랜드사 총 계약금액 등록</h2><p className="modalIntro">{contractModal.customer_name} · {contractModal.reservation_code}</p>
+      <div className="modalGrid">
+        <label>거래처(랜드사)<input value={contractModal.vendor_name||''} onChange={e=>setContractModal({...contractModal,vendor_name:e.target.value})}/></label>
+        <label>계약 확정일<input type="date" value={contractModal.confirmed_date||''} onChange={e=>setContractModal({...contractModal,confirmed_date:e.target.value})}/></label>
+        <label className="span2">송금조건 템플릿<select value={contractModal.template_id||''} onChange={e=>setContractModal({...contractModal,template_id:e.target.value})}><option value="">자동 생성 안 함</option>{templatesForVendor(contractModal.vendor_name).map(t=><option key={t.id} value={t.id}>{t.vendor_name} · {t.template_name}</option>)}</select><small>선택하면 계약 저장과 동시에 신청금·중도금·잔금 송금계획이 자동 생성됩니다.</small></label>
+        <label>통화<select value={contractModal.currency||'USD'} onChange={e=>setContractModal({...contractModal,currency:e.target.value})}><option value="KRW">원화 KRW</option><option value="THB">태국 바트 THB</option><option value="USD">미국 달러 USD</option><option value="EUR">유럽 유로 EUR</option></select></label>
+        <label>계약 외화금액<input type="number" min="0" step="0.01" value={contractModal.contract_foreign_amount||''} onChange={e=>setContractModal({...contractModal,contract_foreign_amount:e.target.value})}/></label>
+        <label>계약 기준환율<input type="number" min="0" step="0.01" value={contractModal.contract_exchange_rate||''} onChange={e=>setContractModal({...contractModal,contract_exchange_rate:e.target.value})}/></label>
+        <label>총 계약금액(원)<input type="number" min="0" value={contractModal.contract_amount_krw||''} onChange={e=>setContractModal({...contractModal,contract_amount_krw:e.target.value})} placeholder="비우면 외화×환율 자동계산"/></label>
+        <label className="span2">비고<textarea rows="3" value={contractModal.note||''} onChange={e=>setContractModal({...contractModal,note:e.target.value})}/></label>
+      </div><div className="modalActions"><button className="secondary" onClick={()=>setContractModal(null)}>취소</button><button className="primary" onClick={saveContract}><Save size={16}/> 계약금액 저장</button></div>
+    </div></div>}
+
+    {remitModal&&<div className="modalBack"><div className="modalBox reservationForm"><button className="close" onClick={()=>setRemitModal(null)}><X/></button><h2>랜드사 송금 등록</h2><p className="modalIntro">{remitModal.customer_name} · {remitModal.reservation_code}</p>
+      <div className="modalGrid">
+        <label>거래처(랜드사)<input value={remitModal.vendor_name||''} onChange={e=>setRemitModal({...remitModal,vendor_name:e.target.value})}/></label>
+        <label>연결 계약<select value={remitModal.land_contract_id||''} onChange={e=>{const c=landContracts.find(x=>x.id===e.target.value);setRemitModal({...remitModal,land_contract_id:e.target.value,vendor_name:c?.vendor_name||remitModal.vendor_name,currency:c?.currency||remitModal.currency})}}><option value="">연결 안 함</option>{reservationContracts(remitModal.reservation_id).map(c=><option key={c.id} value={c.id}>{c.vendor_name} · {won(c.contract_amount_krw)}</option>)}</select></label>
+        <label>송금 단계<select value={remitModal.remittance_stage} onChange={e=>setRemitModal({...remitModal,remittance_stage:e.target.value})}>{Object.entries(REMIT_STAGE).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></label>
+        <label>송금 예정일<input type="date" value={remitModal.due_date||''} onChange={e=>setRemitModal({...remitModal,due_date:e.target.value})}/></label>
+        <label>실제 송금일<input type="date" value={remitModal.paid_date||''} onChange={e=>setRemitModal({...remitModal,paid_date:e.target.value})}/></label>
+        <label>통화<select value={remitModal.currency||'USD'} onChange={e=>setRemitModal({...remitModal,currency:e.target.value})}><option value="KRW">원화 KRW</option><option value="THB">태국 바트 THB</option><option value="USD">미국 달러 USD</option><option value="EUR">유럽 유로 EUR</option></select></label>
+        <label>외화금액<input type="number" min="0" step="0.01" value={remitModal.foreign_amount||''} onChange={e=>setRemitModal({...remitModal,foreign_amount:e.target.value})}/></label>
+        <label>적용환율<input type="number" min="0" step="0.01" value={remitModal.exchange_rate||''} onChange={e=>setRemitModal({...remitModal,exchange_rate:e.target.value})}/></label>
+        <label>원화 송금액<input type="number" min="0" value={remitModal.amount_krw||''} onChange={e=>setRemitModal({...remitModal,amount_krw:e.target.value})} placeholder="비우면 외화×환율 자동계산"/></label>
+        <label className="span2">비고<textarea rows="3" value={remitModal.note||''} onChange={e=>setRemitModal({...remitModal,note:e.target.value})}/></label>
+      </div><div className="modalActions"><button className="secondary" onClick={()=>setRemitModal(null)}>취소</button><button className="primary" onClick={saveRemittance}><Save size={16}/> 송금내역 저장</button></div>
+    </div></div>}
+
     {modal&&<div className="modalBack"><div className="modalBox reservationForm"><button className="close" onClick={()=>setModal(null)}><X/></button><h2>{modal.mode==='edit'?'예약 수정':'새 예약 등록'}</h2>
       <div className="modalGrid">
         <label>예약번호<input value={modal.reservation_code||''} onChange={e=>setModal({...modal,reservation_code:e.target.value})}/></label>
@@ -401,6 +952,31 @@ export default function App(){
         <label>인원<input type="number" min="1" value={modal.traveler_count||1} onChange={e=>setModal({...modal,traveler_count:e.target.value})}/></label>
         <label>출발일<input type="date" value={modal.departure_date||''} onChange={e=>setModal({...modal,departure_date:e.target.value})}/></label>
         <label>도착일<input type="date" value={modal.return_date||''} onChange={e=>setModal({...modal,return_date:e.target.value})}/></label>
+        <label className="checkField"><span>여권 사본 수령</span><input type="checkbox" checked={!!modal.passport_copy_received} onChange={e=>setModal({...modal,passport_copy_received:e.target.checked,passport_copy_received_at:e.target.checked?(modal.passport_copy_received_at||new Date().toISOString().slice(0,10)):''})}/><small>출발일 기준 D-30까지 필수 확인</small></label>
+        <label>여권 사본 수령일<input type="date" disabled={!modal.passport_copy_received} value={modal.passport_copy_received_at||''} onChange={e=>setModal({...modal,passport_copy_received_at:e.target.value})}/></label>
+        {modal.product_type==='honeymoon'&&<>
+          <div className="span2 opsNoticeBox"><b>유럽 허니문 · 중간 이동구간 항공</b><small>유럽 내 도시 간 항공권처럼 발권 후 취소·환불이 어려운 구간이 있는 경우 체크합니다.</small></div>
+          <label className="checkField span2"><span>중간 이동구간 항공 있음</span><input type="checkbox" checked={!!modal.intermediate_air_segment_exists} onChange={e=>setModal({...modal,intermediate_air_segment_exists:e.target.checked,intermediate_air_deposit_paid:e.target.checked?modal.intermediate_air_deposit_paid:false,intermediate_air_deposit_paid_at:e.target.checked?modal.intermediate_air_deposit_paid_at:'',intermediate_air_nonrefundable_notice_done:e.target.checked?modal.intermediate_air_nonrefundable_notice_done:false,intermediate_air_nonrefundable_notice_at:e.target.checked?modal.intermediate_air_nonrefundable_notice_at:''})}/><small>해당 구간이 있는 경우에만 아래 중도금·환불불가 안내를 관리합니다.</small></label>
+          {modal.intermediate_air_segment_exists&&<>
+            <label className="checkField"><span>중간항공 중도금 결제 완료</span><input type="checkbox" checked={!!modal.intermediate_air_deposit_paid} onChange={e=>setModal({...modal,intermediate_air_deposit_paid:e.target.checked,intermediate_air_deposit_paid_at:e.target.checked?(modal.intermediate_air_deposit_paid_at||new Date().toISOString().slice(0,10)):''})}/><small>중간 이동구간 항공권 발권용 중도금 결제 확인</small></label>
+            <label>중도금 결제일<input type="date" disabled={!modal.intermediate_air_deposit_paid} value={modal.intermediate_air_deposit_paid_at||''} onChange={e=>setModal({...modal,intermediate_air_deposit_paid_at:e.target.value})}/></label>
+            <label className="checkField"><span>중도금 환불 불가 안내 완료</span><input type="checkbox" checked={!!modal.intermediate_air_nonrefundable_notice_done} onChange={e=>setModal({...modal,intermediate_air_nonrefundable_notice_done:e.target.checked,intermediate_air_nonrefundable_notice_at:e.target.checked?(modal.intermediate_air_nonrefundable_notice_at||new Date().toISOString().slice(0,10)):''})}/><small>고객에게 해당 중도금은 중간항공 발권 후 환불 불가임을 안내했는지 확인</small></label>
+            <label>환불불가 안내일<input type="date" disabled={!modal.intermediate_air_nonrefundable_notice_done} value={modal.intermediate_air_nonrefundable_notice_at||''} onChange={e=>setModal({...modal,intermediate_air_nonrefundable_notice_at:e.target.value})}/></label>
+          </>}
+        </>}
+        <div className="span2 opsNoticeBox"><b>잔금 환율 변동 정산</b><small>계약 당시 환율과 잔금 결제 시점 환율의 차이만 환율 조정액으로 반영합니다. 적용 통화는 THB · USD · EUR 중 선택합니다.</small></div>
+        <label>환율 적용 통화<select value={modal.fx_currency||''} onChange={e=>setModal({...modal,fx_currency:e.target.value,fx_notice_done:e.target.value?modal.fx_notice_done:false,fx_notice_at:e.target.value?modal.fx_notice_at:''})}><option value="">환율 미적용</option><option value="THB">태국 바트 (THB)</option><option value="USD">미국 달러 (USD)</option><option value="EUR">유럽 유로 (EUR)</option></select></label>
+        <label>1인 외화 적용금액<input type="number" min="0" step="0.01" disabled={!modal.fx_currency} value={modal.fx_foreign_amount_per_person||''} onChange={e=>setModal({...modal,fx_foreign_amount_per_person:e.target.value})} placeholder="예: 1200"/></label>
+        <label>계약 기준환율<input type="number" min="0" step="0.01" disabled={!modal.fx_currency} value={modal.contract_exchange_rate||''} onChange={e=>setModal({...modal,contract_exchange_rate:e.target.value})} placeholder="1통화 = 원"/></label>
+        <label>잔금 적용환율<input type="number" min="0" step="0.01" disabled={!modal.fx_currency} value={modal.balance_exchange_rate||''} onChange={e=>setModal({...modal,balance_exchange_rate:e.target.value})} placeholder="잔금 결제 시 환율"/></label>
+        {modal.fx_currency&&<div className="span2 fxPreview">
+          <div><span>통화</span><b>{fxLabel[modal.fx_currency]}</b></div>
+          <div><span>환율 조정액</span><b>{won(fxAdjustment(modal))}</b></div>
+          <div><span>계약 총액</span><b>{won(modal.sale_amount)}</b></div>
+          <div><span>환율 반영 최종금액</span><b>{won(num(modal.sale_amount)+fxAdjustment(modal))}</b></div>
+        </div>}
+        <label className="checkField"><span>환율 변동에 따른 잔금 변동 안내 완료</span><input type="checkbox" disabled={!modal.fx_currency} checked={!!modal.fx_notice_done} onChange={e=>setModal({...modal,fx_notice_done:e.target.checked,fx_notice_at:e.target.checked?(modal.fx_notice_at||new Date().toISOString().slice(0,10)):''})}/><small>고객에게 잔금 결제 시 환율에 따라 최종 잔금이 증감될 수 있음을 안내</small></label>
+        <label>환율 변동 안내일<input type="date" disabled={!modal.fx_currency||!modal.fx_notice_done} value={modal.fx_notice_at||''} onChange={e=>setModal({...modal,fx_notice_at:e.target.value})}/></label>
         <label>총 매출<input type="number" min="0" value={modal.sale_amount||0} onChange={e=>setModal({...modal,sale_amount:e.target.value})}/></label>
         <label>예약상태<select value={modal.status||'confirmed'} onChange={e=>setModal({...modal,status:e.target.value})}><option value="confirmed">확정</option><option value="ticketed">발권</option><option value="completed">완료</option><option value="cancelled">취소</option></select></label>
         <label className="span2">비고<textarea rows="3" value={modal.memo||''} onChange={e=>setModal({...modal,memo:e.target.value})}/></label>
@@ -420,7 +996,7 @@ function Calendar({rows,date,setDate}){
   while(cells.length%7)cells.push(null)
   const rr=rows.filter(r=>{const d=new Date(r.departure_date);return d.getFullYear()===y&&d.getMonth()===m})
   return <section className="panel calendarPanel">
-    <div className="calendarStats"><div><span>{m+1}월 출발</span><b>{rr.length}팀</b></div><div><span>출발 인원</span><b>{rr.reduce((a,r)=>a+num(r.traveler_count),0)}명</b></div><div><span>확인 필요</span><b>{rr.filter(r=>!r.final_check_done).length}건</b></div><div><span>등록 담당자</span><b>{new Set(rr.map(r=>r.manager_name).filter(Boolean)).size}명</b></div></div>
+    <div className="calendarStats"><div><span>{m+1}월 출발</span><b>{rr.length}팀</b></div><div><span>출발 인원</span><b>{rr.reduce((a,r)=>a+num(r.traveler_count),0)}명</b></div><div><span>확인 필요</span><b>{rr.filter(r=>!r.final_check_done).length}건</b></div><div><span>여권 D-30 미수령</span><b>{rr.filter(r=>{const d=dayDiff(new Date(),r.departure_date);return !r.passport_copy_received&&d!==null&&d<=30&&d>=0}).length}건</b></div><div><span>등록 담당자</span><b>{new Set(rr.map(r=>r.manager_name).filter(Boolean)).size}명</b></div></div>
     <div className="calHead"><button onClick={prev}><ChevronLeft/></button><h2>{y}년 {m+1}월</h2><button onClick={next}><ChevronRight/></button></div>
     <div className="week">{['일','월','화','수','목','금','토'].map(x=><b>{x}</b>)}</div>
     <div className="calendar">{cells.map((d,i)=><div className="day" key={i}>{d&&<><span>{d}</span>{rr.filter(r=>new Date(r.departure_date).getDate()===d).map(r=><div className="event" key={r.id}><b>{r.customer_name}</b><small>{TYPE[r.product_type]||r.product_type} · {r.traveler_count}명</small></div>)}</>}</div>)}</div>
