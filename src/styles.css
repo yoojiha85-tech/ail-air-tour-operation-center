@@ -623,4 +623,4 @@ body{background:var(--ail-bg)}
 @media(max-width:780px){.memberPermGrid{grid-template-columns:1fr}}
 
 /* Login password recovery follows the existing card style. */
-.loginNotice{margin:9px 0 0;padding:10px;border-radius:8px;background:#eef6ff;color:#1f5fa8;font-size:13px;line-height:1.45}.login .passwordResetButton{margin-top:8px;background:transparent;color:#315e99;border:1px solid #c8d9ef}.login .passwordResetButton:hover{background:#f2f7fd}
+.loginNotice{margin:9px 0 0;padding:10px;border-radius:8px;background:#eef6ff;color:#1f5fa8;font-size:13px;line-height:1.45}.login .passwordResetButton{margin-top:8px;background:transparent;color:#315e99;border:1px solid #c8d9ef}.login .passwordResetButton:hover:not(:disabled){background:#f2f7fd}.login .passwordResetButton:disabled{cursor:not-allowed;background:#f5f7fa;color:#8a99aa;border-color:#dbe3ec}.resetCooldownHint{margin:8px 2px 0!important;color:#6d7e91!important;font-size:12px!important;line-height:1.45}

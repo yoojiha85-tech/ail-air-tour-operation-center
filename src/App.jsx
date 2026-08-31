@@ -54,7 +54,13 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
   const [confirmPassword,setConfirmPassword]=useState('')
   const [error,setError]=useState('')
   const [message,setMessage]=useState(notice)
+  const [resetCooldown,setResetCooldown]=useState(0)
   const visibleMessage=message||notice
+  useEffect(()=>{
+    if(resetCooldown<=0)return
+    const timer=window.setInterval(()=>setResetCooldown(seconds=>Math.max(0,seconds-1)),1000)
+    return ()=>window.clearInterval(timer)
+  },[resetCooldown])
   async function submit(e){
     e.preventDefault(); setError('')
     const {error}=await supabase.auth.signInWithPassword({email,password})
@@ -64,7 +70,12 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
     setError('');setMessage('')
     if(!email.trim())return setError('비밀번호 재설정 메일을 받을 이메일을 입력해 주세요.')
     const {error}=await supabase.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin})
-    if(error)return setError(error.message)
+    if(error){
+      const seconds=Number(error.message?.match(/(\d+)\s*seconds?/i)?.[1]||0)
+      if(seconds>0){setResetCooldown(seconds);return setError(`보안을 위해 비밀번호 재설정 메일은 ${seconds}초 후에 다시 요청할 수 있습니다.`)}
+      return setError('비밀번호 재설정 메일을 발송하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    }
+    setResetCooldown(60)
     setMessage('비밀번호 재설정 메일을 발송했습니다. 이메일을 확인해 주세요.')
   }
   async function updatePassword(e){
@@ -90,7 +101,8 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
     {error&&<div className="error">{error}</div>}
     {visibleMessage&&<div className="loginNotice">{visibleMessage}</div>}
     <button>로그인</button>
-    <button type="button" className="passwordResetButton" onClick={sendPasswordReset}>비밀번호를 잊으셨나요?</button>
+    <button type="button" className="passwordResetButton" disabled={resetCooldown>0} onClick={sendPasswordReset}>{resetCooldown>0?`재설정 메일 재요청 (${resetCooldown}초)`:"비밀번호를 잊으셨나요?"}</button>
+    {resetCooldown>0&&<p className="resetCooldownHint">보안을 위해 재설정 메일은 잠시 후 다시 요청할 수 있습니다.</p>}
   </form></div>
 }
 
