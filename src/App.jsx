@@ -60,6 +60,7 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
   const [message,setMessage]=useState(notice)
   const [resetCooldown,setResetCooldown]=useState(0)
   const visibleMessage=message||notice
+  const resetWaitLabel=resetCooldown>=60?`${Math.ceil(resetCooldown/60)}분`:`${resetCooldown}초`
   useEffect(()=>{
     if(resetCooldown<=0)return
     const timer=window.setInterval(()=>setResetCooldown(seconds=>Math.max(0,seconds-1)),1000)
@@ -77,7 +78,11 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
     if(error){
       const seconds=Number(error.message?.match(/(\d+)\s*seconds?/i)?.[1]||0)
       if(seconds>0){setResetCooldown(seconds);return setError(`보안을 위해 비밀번호 재설정 메일은 ${seconds}초 후에 다시 요청할 수 있습니다.`)}
-      return setError('비밀번호 재설정 메일을 발송하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+      const detail=String(error.message||'').toLowerCase()
+      const isRateLimited=error.status===429||/rate limit|too many|security purposes|email.*limit/.test(detail)
+      if(isRateLimited){setResetCooldown(3600);return setError('재설정 메일 요청이 일시적으로 제한되었습니다. 기본 메일 서비스의 발송 한도 때문에 약 1시간 후 다시 시도해 주세요.')}
+      if(/not authorized|unauthorized.*email/.test(detail))return setError('현재 이메일 발송 서비스에서는 이 주소로 메일을 보낼 수 없습니다. 마스터 관리자에게 이메일 발송 설정을 확인해 달라고 요청해 주세요.')
+      return setError('재설정 메일 발송 서비스가 일시적으로 응답하지 않습니다. 10분 후 다시 시도해 주세요. 계속되면 마스터 관리자에게 문의해 주세요.')
     }
     setResetCooldown(60)
     setMessage('비밀번호 재설정 메일을 발송했습니다. 이메일을 확인해 주세요.')
@@ -139,8 +144,8 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
     {error&&<div className="error">{error}</div>}
     {visibleMessage&&<div className="loginNotice">{visibleMessage}</div>}
     <button>로그인</button>
-    <button type="button" className="passwordResetButton" disabled={resetCooldown>0} onClick={sendPasswordReset}>{resetCooldown>0?`재설정 메일 재요청 (${resetCooldown}초)`:"비밀번호를 잊으셨나요?"}</button>
-    {resetCooldown>0&&<p className="resetCooldownHint">보안을 위해 재설정 메일은 잠시 후 다시 요청할 수 있습니다.</p>}
+    <button type="button" className="passwordResetButton" disabled={resetCooldown>0} onClick={sendPasswordReset}>{resetCooldown>0?`재설정 메일 재요청 (${resetWaitLabel} 후)`:"비밀번호를 잊으셨나요?"}</button>
+    {resetCooldown>0&&<p className="resetCooldownHint">보안을 위해 재설정 메일은 잠시 후 다시 요청할 수 있습니다. 메일을 이미 요청했다면 받은편지함과 스팸함도 확인해 주세요.</p>}
     <button type="button" className="signupRequestButton" onClick={()=>{setError('');setMessage('');setScreen('signup')}}>계정 확인 · 회원가입 요청</button>
     <button type="button" className="signupRequestButton" onClick={()=>{setError('');setMessage('');setScreen('createAccount')}}>승인 후 계정 만들기</button>
   </form></div>
