@@ -545,6 +545,18 @@ export default function App(){
     if(error)return alert(error.message)
     setMembers(prev=>prev.map(item=>item.user_id===target.user_id?{...item,permissions}:item))
   }
+  async function changeMasterRole(target,nextRole){
+    if(member?.role!=='master')return alert('마스터 계정만 다른 마스터의 역할을 변경할 수 있습니다.')
+    if(target.user_id===session.user.id)return alert('본인 마스터 계정의 역할은 변경할 수 없습니다.')
+    if(target.role!=='master')return alert('마스터 계정만 역할 변경 대상으로 선택할 수 있습니다.')
+    if(!['manager','staff','viewer'].includes(nextRole))return
+    if(!window.confirm(`${target.display_name||target.email}님의 역할을 ${roleLabel[nextRole]}으로 변경하시겠습니까? 변경 후에는 항목별 권한을 직접 설정할 수 있습니다.`))return
+    const permissions={...defaultPerms}
+    const {error}=await supabase.from('ops_members').update({role:nextRole,permissions}).eq('organization_id',ORG).eq('user_id',target.user_id)
+    if(error)return alert(error.message)
+    setMembers(prev=>prev.map(item=>item.user_id===target.user_id?{...item,role:nextRole,permissions}:item))
+    alert(`${target.display_name||target.email}님의 역할을 ${roleLabel[nextRole]}으로 변경했습니다. 아래 권한 토글에서 필요한 항목을 허용해 주세요.`)
+  }
 
   const TODAY_WORK_LABEL={customer_balance:'고객 잔금',final_check:'최종체크',passport_copy:'여권사본',intermediate_air:'중간항공',land_work:'랜드사 업무'}
   const todayWorkSummary=useMemo(()=>({
@@ -1284,7 +1296,7 @@ export default function App(){
           <button className="wide primary" onClick={saveInvite}>직원 사전 등록</button>
         </div>
         <div className="panel"><div className="panelHead"><div><h2>등록 직원</h2><p>권한 토글을 눌러 즉시 부여하거나 해제할 수 있습니다.</p></div><span className="badge">{members.filter(m=>m.active).length}명 사용 중</span></div>
-          <div>{members.map(m=><div className="staffPermissionCard" key={m.user_id}><div className="staffRow"><div><b>{m.display_name||m.email}</b><span>{m.email}</span></div><div>{roleLabel[m.role]||m.role}</div></div>{m.role==='master'?<p className="staffPermissionNotice">마스터는 모든 권한을 가지며 이 화면에서 변경할 수 없습니다.</p>:<div className="memberPermGrid">{Object.entries(PERM).map(([k,l])=>{const enabled=!!m.permissions?.[k];const locked=m.user_id===session.user.id;return <button type="button" key={k} className={`permissionToggle ${enabled?'enabled':''}`} aria-pressed={enabled} disabled={locked} onClick={()=>toggleMemberPermission(m,k)}><span>{l}</span><i>{enabled?'허용':'미허용'}</i></button>})}</div>}</div>)}</div>
+          <div>{members.map(m=><div className="staffPermissionCard" key={m.user_id}><div className="staffRow"><div><b>{m.display_name||m.email}</b><span>{m.email}</span></div><div>{roleLabel[m.role]||m.role}</div></div>{m.role==='master'?(member?.role==='master'&&m.user_id!==session.user.id?<div className="masterRoleControl"><label>역할 변경<select value="" onChange={e=>{if(e.target.value)changeMasterRole(m,e.target.value)}}><option value="" disabled>직원 역할 선택</option><option value="manager">관리자</option><option value="staff">직원</option><option value="viewer">조회전용</option></select></label><p>역할을 변경하면 마스터 권한이 해제되고, 아래 목록에서 항목별 권한을 설정할 수 있습니다.</p></div>:<p className="staffPermissionNotice">{m.user_id===session.user.id?'본인 마스터 계정의 역할은 변경할 수 없습니다.':'마스터는 모든 권한을 가집니다.'}</p>):<div className="memberPermGrid">{Object.entries(PERM).map(([k,l])=>{const enabled=!!m.permissions?.[k];const locked=m.user_id===session.user.id;return <button type="button" key={k} className={`permissionToggle ${enabled?'enabled':''}`} aria-pressed={enabled} disabled={locked} onClick={()=>toggleMemberPermission(m,k)}><span>{l}</span><i>{enabled?'허용':'미허용'}</i></button>})}</div>}</div>)}</div>
         </div>
         <div className="panel signupRequestsPanel"><div className="panelHead"><div><h2>회원가입 요청</h2><p>외부 이메일 API 없이 마스터가 직접 승인합니다. 승인 후 요청자에게 가입 가능 여부를 안내해 주세요.</p></div><span className="badge">대기 {signupRequests.filter(x=>x.status==='pending').length}건</span></div>
           <div className="signupRequestList">{signupRequests.length===0?<div className="taskEmpty">가입 요청이 없습니다.</div>:signupRequests.map(request=><div className="signupRequestRow" key={request.id}><div><b>{request.full_name}</b><span>{request.email} · 요청 {new Date(request.requested_at).toLocaleString('ko-KR')}</span></div><div className="signupRequestActions"><em className={`signupStatus ${request.status}`}>{request.status==='approved'?'승인됨':request.status==='rejected'?'반려됨':'승인 대기'}</em>{request.status==='pending'&&<><button className="secondary mini" onClick={()=>rejectSignupRequest(request)}>반려</button><button className="primary mini" onClick={()=>approveSignupRequest(request)}>승인</button></>}</div></div>)}</div>
