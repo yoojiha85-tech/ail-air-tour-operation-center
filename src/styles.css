@@ -230,8 +230,8 @@
 .reportTableWrap{overflow:auto}.reportTable{width:100%;border-collapse:collapse;font-size:12px}.reportTable th,.reportTable td{padding:9px 7px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap}.reportTable th{background:#f8fafc;color:#475569;font-size:11px}.reportTable th:nth-child(-n+5),.reportTable td:nth-child(-n+5){text-align:left}.reportGain{color:#166534;font-weight:800}.reportLoss{color:#b91c1c;font-weight:800}.reportFoot{display:flex;flex-direction:column;gap:3px;color:#64748b;font-size:11px;margin:12px 2px 0}
 @media(max-width:760px){.profitReportHeader{display:block}.profitReportActions{padding:12px 0 0}.reportMeta,.reportKpiGrid,.reportCostGrid{grid-template-columns:1fr 1fr}.profitReportModal{width:100vw;max-height:100vh;border-radius:0}.reportKpiGrid b{font-size:17px}}
 @media print{
-  @page{size:A4 landscape;margin:10mm}
-  body *{visibility:hidden!important}
+  @page profit-report{size:A4 landscape;margin:10mm}
+  body:has(.printProfitReport) *{visibility:hidden!important}
   .printProfitReport,.printProfitReport *{visibility:visible!important}
   .printProfitReport{position:absolute!important;left:0!important;top:0!important;width:100%!important;max-width:none!important;max-height:none!important;overflow:visible!important;border:0!important;box-shadow:none!important;padding:0!important;margin:0!important}
   .reportNoPrint,.printProfitReport .close{display:none!important}
@@ -292,12 +292,12 @@ body{background:var(--ail-bg)}
 /* 2026-08-30 PROFIT REPORT — print-only layout repair
    Screen UI and all report calculations remain unchanged. */
 @media print{
-  @page{
-    size:A4 portrait;
-    margin:12mm 10mm 13mm;
+  @page profit-report{
+    size:A4 landscape;
+    margin:10mm;
   }
 
-  html,body{
+  html:has(.printProfitReport),body:has(.printProfitReport){
     width:auto!important;
     height:auto!important;
     min-width:0!important;
@@ -326,6 +326,7 @@ body{background:var(--ail-bg)}
   }
 
   .printProfitReport{
+    page:profit-report!important;
     position:static!important;
     inset:auto!important;
     transform:none!important;
@@ -385,7 +386,7 @@ body{background:var(--ail-bg)}
   /* Scope/meta panel */
   .reportMeta{
     display:grid!important;
-    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
     gap:2mm!important;
     margin:0 0 4mm!important;
     break-inside:avoid!important;
@@ -412,7 +413,7 @@ body{background:var(--ail-bg)}
   /* KPI cards: compact but readable. */
   .reportKpiGrid{
     display:grid!important;
-    grid-template-columns:repeat(2,minmax(0,1fr))!important;
+    grid-template-columns:repeat(4,minmax(0,1fr))!important;
     gap:2mm!important;
     margin:0 0 4mm!important;
     break-inside:avoid!important;
@@ -464,6 +465,10 @@ body{background:var(--ail-bg)}
   .reportSection:first-of-type{
     break-inside:avoid!important;
     page-break-inside:avoid!important;
+  }
+  .reportSection:nth-of-type(2) .reportSectionHead{
+    break-after:avoid!important;
+    page-break-after:avoid!important;
   }
   .reportSectionHead{
     display:flex!important;
