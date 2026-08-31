@@ -415,6 +415,15 @@ export default function App(){
     })
     if(error)alert(error.message);else{alert('직원 사전 등록이 완료되었습니다.');setInvite({display_name:'',email:'',role:'staff',permissions:{...defaultPerms}})}
   }
+  async function toggleMemberPermission(target,key){
+    if(!has(member,'staff_manage'))return alert('직원 권한 관리 권한이 없습니다.')
+    if(target.role==='master')return alert('마스터 권한은 이 화면에서 변경할 수 없습니다.')
+    if(target.user_id===session.user.id)return alert('본인 계정의 권한은 이 화면에서 변경할 수 없습니다.')
+    const permissions={...defaultPerms,...target.permissions,[key]:!target.permissions?.[key]}
+    const {error}=await supabase.from('ops_members').update({permissions}).eq('organization_id',ORG).eq('user_id',target.user_id)
+    if(error)return alert(error.message)
+    setMembers(prev=>prev.map(item=>item.user_id===target.user_id?{...item,permissions}:item))
+  }
 
   const TODAY_WORK_LABEL={customer_balance:'고객 잔금',final_check:'최종체크',passport_copy:'여권사본',intermediate_air:'중간항공',land_work:'랜드사 업무'}
   const todayWorkSummary=useMemo(()=>({
@@ -1150,11 +1159,11 @@ export default function App(){
       {page==='staff'&&<section className="staffGrid">
         <div className="panel"><div className="panelHead"><div><h2>사전 직원 등록</h2><p>가입 전에 이메일과 기본 권한을 등록할 수 있습니다.</p></div></div>
           <div className="staffForm"><label>직원 이름<input value={invite.display_name} onChange={e=>setInvite({...invite,display_name:e.target.value})}/></label><label>이메일<input value={invite.email} onChange={e=>setInvite({...invite,email:e.target.value})}/></label><label>기본 역할<select value={invite.role} onChange={e=>setInvite({...invite,role:e.target.value})}><option value="staff">직원</option><option value="manager">관리자</option><option value="viewer">조회전용</option></select></label></div>
-          <div className="permGrid">{Object.entries(PERM).map(([k,l])=><label key={k}><input type="checkbox" checked={!!invite.permissions[k]} onChange={e=>setInvite({...invite,permissions:{...invite.permissions,[k]:e.target.checked}})}/>{l}</label>)}</div>
+          <div className="permGrid">{Object.entries(PERM).map(([k,l])=><button type="button" key={k} className={`permissionToggle ${invite.permissions[k]?'enabled':''}`} aria-pressed={!!invite.permissions[k]} onClick={()=>setInvite({...invite,permissions:{...invite.permissions,[k]:!invite.permissions[k]}})}><span>{l}</span><i>{invite.permissions[k]?'허용':'미허용'}</i></button>)}</div>
           <button className="wide primary" onClick={saveInvite}>직원 사전 등록</button>
         </div>
-        <div className="panel"><div className="panelHead"><div><h2>등록 직원</h2><p>가입 연결 상태와 부여 권한을 확인합니다.</p></div><span className="badge">{members.filter(m=>m.active).length}명 사용 중</span></div>
-          <div>{members.map(m=><div className="staffRow" key={m.user_id}><div><b>{m.display_name||m.email}</b><span>{m.email}</span></div><div>{roleLabel[m.role]||m.role}</div></div>)}</div>
+        <div className="panel"><div className="panelHead"><div><h2>등록 직원</h2><p>권한 토글을 눌러 즉시 부여하거나 해제할 수 있습니다.</p></div><span className="badge">{members.filter(m=>m.active).length}명 사용 중</span></div>
+          <div>{members.map(m=><div className="staffPermissionCard" key={m.user_id}><div className="staffRow"><div><b>{m.display_name||m.email}</b><span>{m.email}</span></div><div>{roleLabel[m.role]||m.role}</div></div>{m.role==='master'?<p className="staffPermissionNotice">마스터는 모든 권한을 가지며 이 화면에서 변경할 수 없습니다.</p>:<div className="memberPermGrid">{Object.entries(PERM).map(([k,l])=>{const enabled=!!m.permissions?.[k];const locked=m.user_id===session.user.id;return <button type="button" key={k} className={`permissionToggle ${enabled?'enabled':''}`} aria-pressed={enabled} disabled={locked} onClick={()=>toggleMemberPermission(m,k)}><span>{l}</span><i>{enabled?'허용':'미허용'}</i></button>})}</div>}</div>)}</div>
         </div>
       </section>}
     </main>
