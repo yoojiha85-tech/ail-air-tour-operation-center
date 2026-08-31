@@ -48,6 +48,10 @@ const REMIT_STAGE={application:'신청금',interim:'중도금',balance:'잔금',
 const remittancePaid=e=>e?.status==='paid'||!!e?.paid_date
 
 function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
+  const [screen,setScreen]=useState('login')
+  const [signupName,setSignupName]=useState('')
+  const [signupPassword,setSignupPassword]=useState('')
+  const [signupPasswordConfirm,setSignupPasswordConfirm]=useState('')
   const [email,setEmail]=useState('')
   const [password,setPassword]=useState('')
   const [newPassword,setNewPassword]=useState('')
@@ -87,12 +91,46 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
     await supabase.auth.signOut()
     onRecoveryComplete?.('비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.')
   }
+  async function requestSignup(e){
+    e.preventDefault();setError('');setMessage('')
+    if(!signupName.trim())return setError('가입 요청자 이름을 입력해 주세요.')
+    const {error}=await supabase.from('ops_signup_requests').insert({organization_id:ORG,full_name:signupName.trim(),email:email.trim().toLowerCase()})
+    if(error){console.error('signup request failed',error);return setError('가입 요청을 접수하지 못했습니다. 잠시 후 다시 시도하거나 마스터 관리자에게 문의해 주세요.')}
+    setMessage('가입 요청을 접수했습니다. 마스터 관리자 승인 후 가입할 수 있습니다. 승인 안내는 관리자에게 직접 확인해 주세요.')
+    setScreen('login')
+  }
+  async function createApprovedAccount(e){
+    e.preventDefault();setError('');setMessage('')
+    if(signupPassword.length<8)return setError('비밀번호는 8자 이상으로 입력해 주세요.')
+    if(signupPassword!==signupPasswordConfirm)return setError('비밀번호와 비밀번호 확인이 일치하지 않습니다.')
+    const {error}=await supabase.auth.signUp({email:email.trim(),password:signupPassword,options:{emailRedirectTo:window.location.origin}})
+    if(error)return setError('계정을 만들지 못했습니다. 승인된 이메일인지 확인하거나 마스터 관리자에게 문의해 주세요.')
+    setMessage('계정 생성을 요청했습니다. 이메일 확인이 필요한 설정이면 수신 메일을 완료한 뒤 로그인해 주세요. 승인된 사전 등록 이메일만 서비스에 접근할 수 있습니다.')
+    setSignupPassword('');setSignupPasswordConfirm('');setScreen('login')
+  }
   if(passwordRecovery)return <div className="login"><form onSubmit={updatePassword}>
     <h1>새 비밀번호 설정</h1><p>안전한 새 비밀번호를 입력해 주세요.</p>
     <input placeholder="새 비밀번호 (8자 이상)" type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} autoComplete="new-password" required/>
     <input placeholder="새 비밀번호 확인" type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} autoComplete="new-password" required/>
     {error&&<div className="error">{error}</div>}
     <button>비밀번호 변경</button>
+  </form></div>
+  if(screen==='signup')return <div className="login"><form onSubmit={requestSignup}>
+    <h1>회원가입 요청</h1><p>승인 전에는 계정이 생성되지 않습니다.</p>
+    <input placeholder="이름" value={signupName} onChange={e=>setSignupName(e.target.value)} autoComplete="name" required/>
+    <input placeholder="이메일" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required/>
+    {error&&<div className="error">{error}</div>}
+    <button>가입 요청하기</button>
+    <button type="button" className="passwordResetButton" onClick={()=>{setError('');setScreen('login')}}>로그인으로 돌아가기</button>
+  </form></div>
+  if(screen==='createAccount')return <div className="login"><form onSubmit={createApprovedAccount}>
+    <h1>승인 후 계정 만들기</h1><p>관리자에게 승인 안내를 받은 이메일로 계정을 만드세요.</p>
+    <input placeholder="이메일" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required/>
+    <input placeholder="비밀번호 (8자 이상)" type="password" value={signupPassword} onChange={e=>setSignupPassword(e.target.value)} autoComplete="new-password" required/>
+    <input placeholder="비밀번호 확인" type="password" value={signupPasswordConfirm} onChange={e=>setSignupPasswordConfirm(e.target.value)} autoComplete="new-password" required/>
+    {error&&<div className="error">{error}</div>}
+    <button>계정 만들기</button>
+    <button type="button" className="passwordResetButton" onClick={()=>{setError('');setScreen('login')}}>로그인으로 돌아가기</button>
   </form></div>
   return <div className="login"><form onSubmit={submit}>
     <h1>아일항공여행사</h1><p>통합 예약관리</p>
@@ -103,6 +141,8 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
     <button>로그인</button>
     <button type="button" className="passwordResetButton" disabled={resetCooldown>0} onClick={sendPasswordReset}>{resetCooldown>0?`재설정 메일 재요청 (${resetCooldown}초)`:"비밀번호를 잊으셨나요?"}</button>
     {resetCooldown>0&&<p className="resetCooldownHint">보안을 위해 재설정 메일은 잠시 후 다시 요청할 수 있습니다.</p>}
+    <button type="button" className="signupRequestButton" onClick={()=>{setError('');setMessage('');setScreen('signup')}}>계정 확인 · 회원가입 요청</button>
+    <button type="button" className="signupRequestButton" onClick={()=>{setError('');setMessage('');setScreen('createAccount')}}>승인 후 계정 만들기</button>
   </form></div>
 }
 
@@ -116,6 +156,7 @@ export default function App(){
   const [payments,setPayments]=useState([])
   const [expenses,setExpenses]=useState([])
   const [members,setMembers]=useState([])
+  const [signupRequests,setSignupRequests]=useState([])
   const [landContracts,setLandContracts]=useState([])
   const [remitTemplates,setRemitTemplates]=useState([])
   const [remitTemplateItems,setRemitTemplateItems]=useState([])
@@ -205,11 +246,17 @@ export default function App(){
   },[])
   useEffect(()=>{ if(session?.user?.id) loadMember() },[session?.user?.id])
   useEffect(()=>{ if(member) loadAll() },[member?.user_id])
+  useEffect(()=>{ if(member&&page==='staff'&&has(member,'staff_manage'))loadSignupRequests() },[member?.user_id,page])
 
   async function loadMember(){
     const {data,error}=await supabase.from('ops_members').select('*')
       .eq('organization_id',ORG).eq('user_id',session.user.id).maybeSingle()
-    if(error||!data){setError('등록된 직원 권한을 확인할 수 없습니다.');return}
+    if(error||!data){
+      await supabase.auth.signOut()
+      setSession(null)
+      setAuthNotice('승인된 운영 계정을 확인할 수 없습니다. 마스터 관리자에게 문의해 주세요.')
+      return
+    }
     setMember(data)
   }
   async function loadAll(){
@@ -240,6 +287,11 @@ export default function App(){
     if(er)setError(er.message)
     setRows(r.data||[]);setPayments(p.data||[]);setExpenses(e.data||[]);setMembers(m.data||[]);setLandContracts(c.data||[]);setRemitTemplates(t.data||[]);setRemitTemplateItems(ti.data||[]);setReservationChanges(ch.data||[]);setLandAnomalies(a.data||[]);setLandWorkflow(w.data||[]);setLandWorkQueue(q.data||[]);setStaffWorkSummary(sw.data||[]);setLandWorkHistory(wh.data||[]);setTodayWorkCenter(tw.data||[]);setTravelers(tr.data||[]);setAirBookings(ab.data||[]);setHotelBookings(hb.data||[]);setLandBookings(lb.data||[]);setDocuments(doc.data||[]);setVi(v.data||[])
     setLoading(false)
+  }
+  async function loadSignupRequests(){
+    const {data,error}=await supabase.from('ops_signup_requests').select('*').eq('organization_id',ORG).order('requested_at',{ascending:false})
+    if(error){console.error('signup request load failed',error);return}
+    setSignupRequests(data||[])
   }
 
   const payMap=useMemo(()=>Object.fromEntries(rows.map(r=>[r.id,num(r.paid_amount)])),[rows])
@@ -460,6 +512,24 @@ export default function App(){
       role:invite.role,permissions:invite.permissions,active:true,invited_by:session.user.id
     })
     if(error)alert(error.message);else{alert('직원 사전 등록이 완료되었습니다.');setInvite({display_name:'',email:'',role:'staff',permissions:{...defaultPerms}})}
+  }
+  async function approveSignupRequest(request){
+    if(!window.confirm(`${request.full_name} (${request.email})님의 가입 요청을 승인하시겠습니까?`))return
+    const {error:inviteError}=await supabase.from('ops_staff_invites').insert({
+      organization_id:ORG,display_name:request.full_name,email:request.email,
+      role:'staff',permissions:{...defaultPerms,dashboard_view:true,calendar_view:true,reservation_view:true},active:true,invited_by:session.user.id
+    })
+    if(inviteError)return alert(inviteError.message)
+    const {error}=await supabase.from('ops_signup_requests').update({status:'approved',approved_at:new Date().toISOString(),approved_by:session.user.id}).eq('id',request.id).eq('organization_id',ORG)
+    if(error)return alert(error.message)
+    await loadSignupRequests()
+    alert('가입 요청을 승인하고 직원 사전 등록을 완료했습니다. 요청자에게 가입 가능 여부를 직접 안내해 주세요.')
+  }
+  async function rejectSignupRequest(request){
+    if(!window.confirm(`${request.full_name}님의 가입 요청을 반려하시겠습니까?`))return
+    const {error}=await supabase.from('ops_signup_requests').update({status:'rejected',rejected_at:new Date().toISOString(),rejected_by:session.user.id}).eq('id',request.id).eq('organization_id',ORG)
+    if(error)return alert(error.message)
+    await loadSignupRequests()
   }
   async function toggleMemberPermission(target,key){
     if(!has(member,'staff_manage'))return alert('직원 권한 관리 권한이 없습니다.')
@@ -1210,6 +1280,9 @@ export default function App(){
         </div>
         <div className="panel"><div className="panelHead"><div><h2>등록 직원</h2><p>권한 토글을 눌러 즉시 부여하거나 해제할 수 있습니다.</p></div><span className="badge">{members.filter(m=>m.active).length}명 사용 중</span></div>
           <div>{members.map(m=><div className="staffPermissionCard" key={m.user_id}><div className="staffRow"><div><b>{m.display_name||m.email}</b><span>{m.email}</span></div><div>{roleLabel[m.role]||m.role}</div></div>{m.role==='master'?<p className="staffPermissionNotice">마스터는 모든 권한을 가지며 이 화면에서 변경할 수 없습니다.</p>:<div className="memberPermGrid">{Object.entries(PERM).map(([k,l])=>{const enabled=!!m.permissions?.[k];const locked=m.user_id===session.user.id;return <button type="button" key={k} className={`permissionToggle ${enabled?'enabled':''}`} aria-pressed={enabled} disabled={locked} onClick={()=>toggleMemberPermission(m,k)}><span>{l}</span><i>{enabled?'허용':'미허용'}</i></button>})}</div>}</div>)}</div>
+        </div>
+        <div className="panel signupRequestsPanel"><div className="panelHead"><div><h2>회원가입 요청</h2><p>외부 이메일 API 없이 마스터가 직접 승인합니다. 승인 후 요청자에게 가입 가능 여부를 안내해 주세요.</p></div><span className="badge">대기 {signupRequests.filter(x=>x.status==='pending').length}건</span></div>
+          <div className="signupRequestList">{signupRequests.length===0?<div className="taskEmpty">가입 요청이 없습니다.</div>:signupRequests.map(request=><div className="signupRequestRow" key={request.id}><div><b>{request.full_name}</b><span>{request.email} · 요청 {new Date(request.requested_at).toLocaleString('ko-KR')}</span></div><div className="signupRequestActions"><em className={`signupStatus ${request.status}`}>{request.status==='approved'?'승인됨':request.status==='rejected'?'반려됨':'승인 대기'}</em>{request.status==='pending'&&<><button className="secondary mini" onClick={()=>rejectSignupRequest(request)}>반려</button><button className="primary mini" onClick={()=>approveSignupRequest(request)}>승인</button></>}</div></div>)}</div>
         </div>
       </section>}
     </main>
