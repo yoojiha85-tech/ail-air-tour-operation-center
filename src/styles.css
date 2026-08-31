@@ -621,3 +621,6 @@ body{background:var(--ail-bg)}
 .permissionToggle span{min-width:0;line-height:1.35}.permissionToggle i{flex:0 0 auto;min-width:42px;padding:4px 7px;border-radius:999px;background:#e5e7eb;color:#64748b;font-size:10px;font-style:normal;text-align:center}.permissionToggle.enabled{border-color:#7dc0a3;background:#eefaf3;color:#166534}.permissionToggle.enabled i{background:#167a48;color:#fff}.permissionToggle:hover:not(:disabled){border-color:#4d86cf}.permissionToggle:focus-visible{outline:3px solid #bfdbfe;outline-offset:2px}.permissionToggle:disabled{cursor:not-allowed;opacity:.58}
 .staffPermissionCard{border-bottom:1px solid #edf1f5}.staffPermissionCard:last-child{border-bottom:0}.staffPermissionNotice{margin:0;padding:12px 18px 16px;color:#64748b;font-size:12px;line-height:1.5}
 @media(max-width:780px){.memberPermGrid{grid-template-columns:1fr}}
+
+/* Login password recovery follows the existing card style. */
+.loginNotice{margin:9px 0 0;padding:10px;border-radius:8px;background:#eef6ff;color:#1f5fa8;font-size:13px;line-height:1.45}.login .passwordResetButton{margin-top:8px;background:transparent;color:#315e99;border:1px solid #c8d9ef}.login .passwordResetButton:hover{background:#f2f7fd}

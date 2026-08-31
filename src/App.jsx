@@ -47,26 +47,57 @@ const fxAdjustment=r=>Math.round((num(r?.balance_exchange_rate)-num(r?.contract_
 const REMIT_STAGE={application:'신청금',interim:'중도금',balance:'잔금',additional:'추가송금'}
 const remittancePaid=e=>e?.status==='paid'||!!e?.paid_date
 
-function Login(){
+function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
   const [email,setEmail]=useState('')
   const [password,setPassword]=useState('')
+  const [newPassword,setNewPassword]=useState('')
+  const [confirmPassword,setConfirmPassword]=useState('')
   const [error,setError]=useState('')
+  const [message,setMessage]=useState(notice)
+  const visibleMessage=message||notice
   async function submit(e){
     e.preventDefault(); setError('')
     const {error}=await supabase.auth.signInWithPassword({email,password})
     if(error)setError('이메일 또는 비밀번호를 확인해 주세요.')
   }
+  async function sendPasswordReset(){
+    setError('');setMessage('')
+    if(!email.trim())return setError('비밀번호 재설정 메일을 받을 이메일을 입력해 주세요.')
+    const {error}=await supabase.auth.resetPasswordForEmail(email.trim(),{redirectTo:window.location.origin})
+    if(error)return setError(error.message)
+    setMessage('비밀번호 재설정 메일을 발송했습니다. 이메일을 확인해 주세요.')
+  }
+  async function updatePassword(e){
+    e.preventDefault();setError('');setMessage('')
+    if(newPassword.length<8)return setError('새 비밀번호는 8자 이상으로 입력해 주세요.')
+    if(newPassword!==confirmPassword)return setError('새 비밀번호와 비밀번호 확인이 일치하지 않습니다.')
+    const {error}=await supabase.auth.updateUser({password:newPassword})
+    if(error)return setError(error.message)
+    await supabase.auth.signOut()
+    onRecoveryComplete?.('비밀번호가 변경되었습니다. 새 비밀번호로 로그인해 주세요.')
+  }
+  if(passwordRecovery)return <div className="login"><form onSubmit={updatePassword}>
+    <h1>새 비밀번호 설정</h1><p>안전한 새 비밀번호를 입력해 주세요.</p>
+    <input placeholder="새 비밀번호 (8자 이상)" type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} autoComplete="new-password" required/>
+    <input placeholder="새 비밀번호 확인" type="password" value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} autoComplete="new-password" required/>
+    {error&&<div className="error">{error}</div>}
+    <button>비밀번호 변경</button>
+  </form></div>
   return <div className="login"><form onSubmit={submit}>
     <h1>아일항공여행사</h1><p>통합 예약관리</p>
     <input placeholder="이메일" type="email" value={email} onChange={e=>setEmail(e.target.value)} required/>
     <input placeholder="비밀번호" type="password" value={password} onChange={e=>setPassword(e.target.value)} required/>
     {error&&<div className="error">{error}</div>}
+    {visibleMessage&&<div className="loginNotice">{visibleMessage}</div>}
     <button>로그인</button>
+    <button type="button" className="passwordResetButton" onClick={sendPasswordReset}>비밀번호를 잊으셨나요?</button>
   </form></div>
 }
 
 export default function App(){
   const [session,setSession]=useState(null)
+  const [passwordRecovery,setPasswordRecovery]=useState(false)
+  const [authNotice,setAuthNotice]=useState('')
   const [member,setMember]=useState(null)
   const [page,setPage]=useState('dashboard')
   const [rows,setRows]=useState([])
@@ -154,7 +185,10 @@ export default function App(){
 
   useEffect(()=>{
     supabase.auth.getSession().then(({data})=>{setSession(data.session);setLoading(false)})
-    const {data}=supabase.auth.onAuthStateChange((_e,s)=>setSession(s))
+    const {data}=supabase.auth.onAuthStateChange((event,s)=>{
+      if(event==='PASSWORD_RECOVERY')setPasswordRecovery(true)
+      setSession(s)
+    })
     return ()=>data.subscription.unsubscribe()
   },[])
   useEffect(()=>{ if(session?.user?.id) loadMember() },[session?.user?.id])
@@ -993,7 +1027,7 @@ export default function App(){
   }
 
   if(loading&&!session)return <div className="center">불러오는 중...</div>
-  if(!session)return <Login/>
+  if(!session||passwordRecovery)return <Login passwordRecovery={passwordRecovery} notice={authNotice} onRecoveryComplete={message=>{setSession(null);setPasswordRecovery(false);setAuthNotice(message)}}/>
   if(!member)return <div className="center">{error||'권한 확인 중...'}</div>
 
   const nav=NAV.filter(n=>has(member,n[2]))
