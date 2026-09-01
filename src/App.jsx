@@ -905,7 +905,7 @@ export default function App(){
     const plan=items.map(i=>{
       const amount=i.calc_type==='fixed_krw'?num(i.calc_value):Math.round(baseAmount*num(i.calc_value)/100)
       const base=i.due_basis==='contract'?(contract.confirmed_date||new Date().toISOString().slice(0,10)):reservation.departure_date
-      return {organization_id:ORG,reservation_id:contract.reservation_id,vendor_name:contract.vendor_name,expense_type:'land',land_contract_id:contract.id,remittance_stage:i.remittance_stage,due_date:shiftDate(base,i.due_offset_days),currency:'KRW',amount_krw:amount,status:'pending',note:'랜드사 송금조건 템플릿 자동생성',created_by:session.user.id}
+      return {organization_id:ORG,reservation_id:contract.reservation_id,vendor_name:contract.vendor_name,expense_type:'land',land_contract_id:contract.id,remittance_stage:i.remittance_stage,due_date:shiftDate(base,i.due_offset_days),currency:'KRW',foreign_amount:amount,exchange_rate:1,amount_krw:amount,status:'pending',note:'랜드사 송금조건 템플릿 자동생성',created_by:session.user.id}
     }).filter(x=>x.amount_krw>0)
     if(plan.length){
       const {error}=await supabase.from('ops_expenses').insert(plan)
@@ -1030,16 +1030,18 @@ export default function App(){
   async function saveRemittance(){
     if(!remitModal||!has(member,'expense_manage'))return
     if(!String(remitModal.vendor_name||'').trim())return alert('거래처(랜드사)를 입력해 주세요.')
+    const currency=remitModal.currency||'KRW'
     const foreign=num(remitModal.foreign_amount), rate=num(remitModal.exchange_rate)
     const krw=num(remitModal.amount_krw)||(foreign&&rate?Math.round(foreign*rate):0)
     if(krw<=0)return alert('송금 금액을 입력해 주세요.')
+    if(currency!=='KRW'&&(foreign<=0||rate<=0))return alert('외화 송금은 외화금액과 적용환율을 모두 입력해 주세요.')
     const payload={
       organization_id:ORG,reservation_id:remitModal.reservation_id,
       vendor_name:remitModal.vendor_name.trim(),expense_type:'land',
       land_contract_id:remitModal.land_contract_id||null,remittance_stage:remitModal.remittance_stage,
       due_date:remitModal.due_date||null,paid_date:remitModal.paid_date||null,
-      currency:remitModal.currency||'KRW',foreign_amount:foreign||null,
-      exchange_rate:rate||null,exchange_rate_date:remitModal.paid_date||remitModal.due_date||null,
+      currency,foreign_amount:currency==='KRW'?krw:foreign,
+      exchange_rate:currency==='KRW'?1:rate,exchange_rate_date:remitModal.paid_date||remitModal.due_date||null,
       amount_krw:krw,status:remitModal.paid_date?'paid':'pending',
       note:remitModal.note||null,created_by:session.user.id
     }
@@ -1349,7 +1351,7 @@ export default function App(){
       </div><div className="modalActions"><button className="secondary" onClick={()=>closeEditableModal('contract',contractModal)}>닫기</button><button className="primary" onClick={saveContract}><Save size={16}/> 계약금액 저장</button></div>
     </div></div>}
 
-    {remitModal&&<div className="modalBack"><div className={`modalBox reservationForm ${isModalDirty('remittance',remitModal)?'hasUnsaved':''}`}><button className="close" onClick={()=>closeEditableModal('remittance',remitModal)}><X/></button><h2>랜드사 송금 등록</h2><p className="modalIntro">{remitModal.customer_name} · {remitModal.reservation_code}</p>
+    {remitModal&&<div className="modalBack"><div className={`modalBox remittanceModal ${isModalDirty('remittance',remitModal)?'hasUnsaved':''}`}><button className="close" onClick={()=>closeEditableModal('remittance',remitModal)}><X/></button><h2>랜드사 송금 등록</h2><p className="modalIntro">{remitModal.customer_name} · {remitModal.reservation_code}</p>
       <div className="modalGrid">
         <label>거래처(랜드사)<input value={remitModal.vendor_name||''} onChange={e=>setRemitModal({...remitModal,vendor_name:e.target.value})}/></label>
         <label>연결 계약<select value={remitModal.land_contract_id||''} onChange={e=>{const c=landContracts.find(x=>x.id===e.target.value);setRemitModal({...remitModal,land_contract_id:e.target.value,vendor_name:c?.vendor_name||remitModal.vendor_name,currency:c?.currency||remitModal.currency})}}><option value="">연결 안 함</option>{reservationContracts(remitModal.reservation_id).map(c=><option key={c.id} value={c.id}>{c.vendor_name} · {won(c.contract_amount_krw)}</option>)}</select></label>
