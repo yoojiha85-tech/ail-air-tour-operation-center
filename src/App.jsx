@@ -47,6 +47,15 @@ const fxAdjustment=r=>Math.round((num(r?.balance_exchange_rate)-num(r?.contract_
 const REMIT_STAGE={application:'신청금',interim:'중도금',balance:'잔금',additional:'추가송금'}
 const remittancePaid=e=>e?.status==='paid'||!!e?.paid_date
 
+async function syncReservationToGoogleSheets(action,reservationId){
+  if(!reservationId)return
+  const {error}=await supabase.functions.invoke('sync-reservation-to-google-sheets',{body:{action,reservationId}})
+  if(error){
+    console.error('Google Sheets reservation sync failed',error)
+    alert('예약은 저장되었지만 Google Sheets 동기화에 실패했습니다. 잠시 후 다시 저장하거나 관리자에게 문의해 주세요.')
+  }
+}
+
 function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
   const [screen,setScreen]=useState('login')
   const [signupName,setSignupName]=useState('')
@@ -1112,8 +1121,9 @@ export default function App(){
     }else{
       q=supabase.from('ops_reservations').insert({...payload,organization_id:ORG,created_by:session.user.id})
     }
-    const {error}=await q
+    const {data,error}=await q.select('id').single()
     if(error)return alert(error.message)
+    await syncReservationToGoogleSheets('upsert',data.id)
     setModal(null); await loadAll()
   }
 
@@ -1122,6 +1132,7 @@ export default function App(){
     if(!confirm(`${r.customer_name} 예약을 삭제하시겠습니까?`))return
     const {error}=await supabase.from('ops_reservations').delete().eq('organization_id',ORG).eq('id',r.id)
     if(error)return alert(error.message)
+    await syncReservationToGoogleSheets('delete',r.id)
     await loadAll()
   }
 
