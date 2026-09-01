@@ -1,4 +1,25 @@
+const NAV = [
+  ['dashboard','▦ 통합 대시보드','dashboard_view'],
+  ['calendar','▣ 출발 캘린더','calendar_view'],
+  ['honeymoon','허니문','reservation_view'],
+  ['package','해외패키지','reservation_view'],
+  ['air','해외항공권','reservation_view'],
+  ['group','국내·외 단체','reservation_view'],
+  ['airvi','✈ 2026년 항공 발권 VI','air_vi_view'],
+  ['staff','⚙ 직원·권한 관리','staff_manage'],
+]
 
+const TYPE = {
+  honeymoon:'허니문',
+  package:'해외패키지',
+  air:'해외항공권',
+  group:'국내·외 단체'
+}
+
+const num=v=>Number(v||0)
+const won=v=>`${num(v).toLocaleString('ko-KR')}원`
+const ymd=d=>d?String(d).slice(0,10):'-'
+const monthLabel=m=>`${m}월`
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './lib/supabase'
 import {
