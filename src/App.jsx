@@ -631,13 +631,21 @@ export default function App(){
     await loadAll()
   }
 
-  function goToTodayWork(x){
-    const r=rows.find(v=>v.id===x.reservation_id);if(!r)return
-    if(x.task_type==='land_work'){openDetail(r,'expenses');return}
-    if(x.task_type==='customer_balance'){openDetail(r,'payments');return}
-    if(['final_check','passport_copy','intermediate_air'].includes(x.task_type)){openDetail(r,'checklist');return}
-    openDetail(r,'overview')
-  }
+ async function goToTodayWork(x){
+    if(['consultation_new','consultation_contacting'].includes(x.task_type)){
+      const {data,error}=await supabase
+        .from('ops_consultations')
+        .select('*')
+        .eq('organization_id',ORG)
+        .eq('request_code',x.reservation_code)
+        .maybeSingle()
+
+      if(error)return alert(error.message)
+      if(!data)return alert('상담 접수 정보를 찾을 수 없습니다.')
+
+      setConsultationModal(data)
+      return
+    }
 
   async function quickReservationUpdate(reservationId,patch,successMessage){
     if(!has(member,'reservation_edit'))return alert('예약 수정 권한이 없습니다.')
