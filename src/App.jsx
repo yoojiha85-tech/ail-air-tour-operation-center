@@ -631,7 +631,7 @@ export default function App(){
     await loadAll()
   }
 
- async function goToTodayWork(x){
+async function goToTodayWork(x){
     if(['consultation_new','consultation_contacting'].includes(x.task_type)){
       const {data,error}=await supabase
         .from('ops_consultations')
@@ -646,6 +646,91 @@ export default function App(){
       setConsultationModal(data)
       return
     }
+
+    const r=rows.find(v=>v.id===x.reservation_id)
+    if(!r)return
+
+    if(x.task_type==='land_work'){openDetail(r,'expenses');return}
+    if(x.task_type==='customer_balance'){openDetail(r,'payments');return}
+    if(['final_check','passport_copy','intermediate_air'].includes(x.task_type)){
+      openDetail(r,'checklist')
+      return
+    }
+    openDetail(r,'overview')
+  }
+
+  async function startConsultation(c){
+    if(!has(member,'reservation_edit')){
+      return alert('상담 상태 변경 권한이 없습니다.')
+    }
+
+    const now=new Date().toISOString()
+    const patch={
+      status:'contacting',
+      updated_at:now
+    }
+
+    if(!c.first_contact_at)patch.first_contact_at=now
+    if(!c.assigned_to)patch.assigned_to=session.user.id
+
+    const {data,error}=await supabase
+      .from('ops_consultations')
+      .update(patch)
+      .eq('organization_id',ORG)
+      .eq('id',c.id)
+      .select()
+      .single()
+
+    if(error)return alert(error.message)
+
+    setConsultationModal(data)
+    await loadAll()
+  }
+
+  async function convertConsultation(c){
+    if(!has(member,'reservation_create')||!has(member,'reservation_edit')){
+      return alert('예약 생성 및 상담 전환 권한이 필요합니다.')
+    }
+
+    if(c.reservation_id){
+      const linked=rows.find(r=>r.id===c.reservation_id)
+      setConsultationModal(null)
+      if(linked)openDetail(linked,'overview')
+      return
+    }
+
+    if(!confirm(
+      `${c.customer_name} 고객 상담을 신규 예약으로 전환하시겠습니까?\n예약 상태는 '문의'로 생성됩니다.`
+    ))return
+
+    const {data,error}=await supabase.rpc(
+      'convert_consultation_to_reservation',
+      {p_consultation_id:c.id}
+    )
+
+    if(error)return alert(error.message)
+
+    const result=Array.isArray(data)?data[0]:data
+    if(!result?.reservation_id){
+      return alert('예약 전환 결과를 확인할 수 없습니다.')
+    }
+
+    await syncReservationToGoogleSheets('create',result.reservation_id)
+
+    const {data:created}=await supabase
+      .from('ops_reservations')
+      .select('*')
+      .eq('organization_id',ORG)
+      .eq('id',result.reservation_id)
+      .maybeSingle()
+
+    setConsultationModal(null)
+    await loadAll()
+
+    alert(`예약 전환이 완료되었습니다.\n예약번호: ${result.reservation_code||''}`)
+
+    if(created)openDetail(created,'overview')
+  }
 
   async function quickReservationUpdate(reservationId,patch,successMessage){
     if(!has(member,'reservation_edit'))return alert('예약 수정 권한이 없습니다.')
