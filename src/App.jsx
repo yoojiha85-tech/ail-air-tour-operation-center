@@ -1408,8 +1408,8 @@ export default function App(){
 
     {paymentModal&&<div className="modalBack"><div className={`modalBox paymentQuickModal ${isModalDirty('payment',paymentModal)?'hasUnsaved':''}`}><button className="close" onClick={()=>closeEditableModal('payment',paymentModal)}><X/></button><h2>고객 잔금 입금 등록</h2><p className="modalLead">{paymentModal.customer_name} · {paymentModal.reservation_code}</p><div className="modalGrid"><label>입금일<input type="date" value={paymentModal.payment_date||''} onChange={e=>setPaymentModal({...paymentModal,payment_date:e.target.value})}/></label><label>입금방법<select value={paymentModal.payment_method||'transfer'} onChange={e=>setPaymentModal({...paymentModal,payment_method:e.target.value})}><option value="transfer">계좌이체</option><option value="card">카드</option><option value="cash">현금</option><option value="mixed">복합</option></select></label><label className="span2">입금액<input type="number" min="0" value={paymentModal.amount||''} onChange={e=>setPaymentModal({...paymentModal,amount:e.target.value})}/></label><label className="span2">비고<textarea rows="3" value={paymentModal.note||''} onChange={e=>setPaymentModal({...paymentModal,note:e.target.value})}/></label></div><div className="paymentSafety"><b>잔금 완료 기준</b><span>이 버튼은 실제 입금내역을 저장합니다. 저장 후 누적입금액이 최종 판매금액에 도달해야 잔금 업무가 자동으로 사라집니다.</span></div><div className="modalActions"><button className="secondary" onClick={()=>closeEditableModal('payment',paymentModal)}>닫기</button><button className="primary" onClick={saveBalancePayment}><Save size={16}/> 입금 저장</button></div></div></div>}
 
-    {modal&&<div className="modalBack"><div className={`modalBox reservationForm ${isModalDirty('reservation',modal)?'hasUnsaved':''}`}><button className="close" onClick={()=>closeEditableModal('reservation',modal)}><X/></button><h2>{modal.mode==='edit'?'예약 수정':'새 예약 등록'}</h2>
-      <div className="modalGrid">
+    {modal&&<div className="modalBack"><div className={`modalBox reservationForm ${isModalDirty('reservation',modal)?'hasUnsaved':''}`}><div className="reservationFormHeader"><button className="close" onClick={()=>closeEditableModal('reservation',modal)}><X/></button><h2>{modal.mode==='edit'?'예약 수정':'새 예약 등록'}</h2></div>
+      <div className="reservationFormBody"><div className="modalGrid">
         <label>예약번호<input value={modal.reservation_code||''} onChange={e=>setModal({...modal,reservation_code:e.target.value})}/></label>
         <label>상품구분<select value={modal.product_type||'honeymoon'} onChange={e=>setModal({...modal,product_type:e.target.value})}><option value="honeymoon">허니문</option><option value="package">해외패키지</option><option value="air">해외항공권</option><option value="group">국내·외 단체</option></select></label>
         <label>고객명<input value={modal.customer_name||''} onChange={e=>setModal({...modal,customer_name:e.target.value})}/></label>
@@ -1449,8 +1449,8 @@ export default function App(){
         <label>총 매출<input type="number" min="0" value={modal.sale_amount||0} onChange={e=>setModal({...modal,sale_amount:e.target.value})}/></label>
         <label>예약상태<select value={modal.status||'confirmed'} onChange={e=>setModal({...modal,status:e.target.value})}><option value="confirmed">확정</option><option value="ticketed">발권</option><option value="completed">완료</option><option value="cancelled">취소</option></select></label>
         <label className="span2">비고<textarea rows="3" value={modal.memo||''} onChange={e=>setModal({...modal,memo:e.target.value})}/></label>
-      </div>
-      <div className="modalActions"><button className="secondary" onClick={()=>closeEditableModal('reservation',modal)}>닫기</button><button className="primary" onClick={saveReservation}><Save size={16}/> 저장</button></div>
+      </div></div>
+      <div className="modalActions reservationFormActions"><button className="secondary" onClick={()=>closeEditableModal('reservation',modal)}>닫기</button><button className="primary" onClick={saveReservation}><Save size={16}/> 저장</button></div>
     </div></div>}
   </div>
 }
