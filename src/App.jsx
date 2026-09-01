@@ -20,7 +20,7 @@ const PERM = {
 }
 const defaultPerms = Object.fromEntries(Object.keys(PERM).map(k=>[k,false]))
 
-const NAV = [
+NAV = [
   ['dashboard','▦ 통합 대시보드','dashboard_view'],
   ['calendar','▣ 출발 캘린더','calendar_view'],
   ['honeymoon','허니문','reservation_view'],
@@ -31,11 +31,11 @@ const NAV = [
   ['staff','⚙ 직원·권한 관리','staff_manage'],
 ]
 
-const TYPE = {honeymoon:'허니문',package:'해외패키지',air:'해외항공권',group:'국내·외 단체'}
-const num=v=>Number(v||0)
-const won=v=>`${num(v).toLocaleString('ko-KR')}원`
-const ymd=d=>d?String(d).slice(0,10):'-'
-const monthLabel=m=>`${m}월`
+TYPE = {honeymoon:'허니문',package:'해외패키지',air:'해외항공권',group:'국내·외 단체'}
+num=v=>Number(v||0)
+won=v=>`${num(v).toLocaleString('ko-KR')}원`
+ymd=d=>d?String(d).slice(0,10):'-'
+monthLabel=m=>`${m}월`
 const methodLabel={transfer:'입금',card:'카드',cash:'현금',mixed:'혼합'}
 const roleLabel={master:'마스터',manager:'관리자',staff:'직원',viewer:'조회전용'}
 const has=(m,k)=>m?.role==='master'||m?.permissions?.[k]===true
@@ -182,6 +182,7 @@ export default function App(){
   const [staffWorkFilter,setStaffWorkFilter]=useState('')
   const [landWorkHistory,setLandWorkHistory]=useState([])
   const [todayWorkCenter,setTodayWorkCenter]=useState([])
+  const [consultationModal,setConsultationModal]=useState(null)
   const [travelers,setTravelers]=useState([])
   const [airBookings,setAirBookings]=useState([])
   const [hotelBookings,setHotelBookings]=useState([])
