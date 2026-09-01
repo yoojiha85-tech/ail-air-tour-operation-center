@@ -1428,6 +1428,154 @@ async function goToTodayWork(x){
       </section>}
     </main>
 
+     {consultationModal&&
+      <div className="modalBack">
+        <div className="modalBox reservationForm">
+          <button
+            type="button"
+            className="close"
+            onClick={()=>setConsultationModal(null)}
+          >
+            <X/>
+          </button>
+
+          <h2>신규 상담 상세</h2>
+
+          <p className="modalIntro">
+            {consultationModal.request_code} · {consultationModal.request_type}
+          </p>
+
+          <div className="modalGrid">
+            <label>
+              고객명
+              <input readOnly value={consultationModal.customer_name||''}/>
+            </label>
+
+            <label>
+              전화번호
+              <input readOnly value={consultationModal.phone||''}/>
+            </label>
+
+            <label>
+              희망여행지
+              <input readOnly value={consultationModal.destination||''}/>
+            </label>
+
+            <label>
+              출발예정일
+              <input
+                readOnly
+                value={
+                  ymd(consultationModal.departure_date)==='-'
+                    ? ''
+                    : ymd(consultationModal.departure_date)
+                }
+              />
+            </label>
+
+            <label>
+              여행인원
+              <input readOnly value={consultationModal.traveler_count||''}/>
+            </label>
+
+            <label>
+              예상예산
+              <input readOnly value={consultationModal.budget||''}/>
+            </label>
+
+            <label>
+              예식일
+              <input
+                readOnly
+                value={
+                  ymd(consultationModal.wedding_date)==='-'
+                    ? ''
+                    : ymd(consultationModal.wedding_date)
+                }
+              />
+            </label>
+
+            <label>
+              상담상태
+              <input
+                readOnly
+                value={
+                  ({
+                    new:'신규',
+                    contacting:'상담중',
+                    quoted:'견적발송',
+                    contracted:'계약완료',
+                    converted:'예약전환',
+                    hold:'보류',
+                    closed:'종료'
+                  })[consultationModal.status]
+                  ||consultationModal.status
+                  ||''
+                }
+              />
+            </label>
+
+            <label className="span2">
+              요청사항
+              <textarea
+                rows="4"
+                readOnly
+                value={consultationModal.request_memo||'별도 요청사항 없음'}
+              />
+            </label>
+          </div>
+
+          <div className="modalActions">
+            <button
+              type="button"
+              className="secondary"
+              onClick={()=>setConsultationModal(null)}
+            >
+              닫기
+            </button>
+
+            <button
+              type="button"
+              className="secondary"
+              onClick={()=>{
+                window.location.href=
+                  `tel:${String(consultationModal.phone||'').replace(/[^0-9+]/g,'')}`
+              }}
+            >
+              전화하기
+            </button>
+
+            <button
+              type="button"
+              disabled={
+                consultationModal.status!=='new'
+                ||!has(member,'reservation_edit')
+              }
+              onClick={()=>startConsultation(consultationModal)}
+            >
+              {consultationModal.status==='new'
+                ? '상담 시작'
+                : '상담 진행중'}
+            </button>
+
+            <button
+              type="button"
+              className="primary"
+              disabled={
+                !!consultationModal.reservation_id
+                ||!has(member,'reservation_create')
+                ||!has(member,'reservation_edit')
+              }
+              onClick={()=>convertConsultation(consultationModal)}
+            >
+              {consultationModal.reservation_id
+                ? '예약 연결완료'
+                : '예약으로 전환'}
+            </button>
+          </div>
+        </div>
+      </div>
+    }
     {taskCompleteModal&&<div className="modalBack"><form className={`modalBox taskCompleteModal ${isModalDirty('completion',taskCompleteModal)?'hasUnsaved':''}`} onSubmit={completeLandTask}><button type="button" className="close" onClick={()=>closeEditableModal('completion',taskCompleteModal)}><X/></button><h2>랜드사 업무 처리완료</h2><p className="modalIntro">{taskCompleteModal.customer_name} · {taskCompleteModal.reservation_code} · {LAND_WORKFLOW_LABEL[taskCompleteModal.workflow_step]}</p><div className="completionCaution">업무 처리완료는 직원 처리 기록입니다. 실제 계약·신청금·중도금·잔금 상태는 계약·송금 데이터가 변경될 때만 다음 단계로 이동합니다.</div><label>완료 메모<textarea value={taskCompleteModal.completion_note||''} onChange={e=>setTaskCompleteModal({...taskCompleteModal,completion_note:e.target.value})} placeholder="처리 내용·확인사항·인수인계 메모"/></label><div className="modalActions"><button type="button" className="secondary" onClick={()=>closeEditableModal('completion',taskCompleteModal)}>닫기</button><button type="submit"><Save size={16}/> 처리완료</button></div></form></div>}
     {workHistoryReservation&&<div className="modalBack"><div className="modalBox workHistoryModal"><button type="button" className="close" onClick={()=>setWorkHistoryReservation(null)}><X/></button><h2>랜드사 업무 처리이력</h2><p className="modalIntro">{rows.find(r=>r.id===workHistoryReservation)?.customer_name||rows.find(r=>r.id===workHistoryReservation)?.reservation_code||'예약'}</p><div className="workHistoryList">{workHistoryForReservation(workHistoryReservation).length===0?<div className="taskEmpty">저장된 업무 처리이력이 없습니다.</div>:workHistoryForReservation(workHistoryReservation).map(h=><div className={`workHistoryItem ${h.action}`} key={h.id}><span className="historyDot"/><div><div className="workHistoryHead"><b>{h.action==='complete'?'처리완료':h.action==='reopen'?'재오픈':h.action==='create'?'업무 생성':'업무 수정'} · {LAND_WORKFLOW_LABEL[h.workflow_step]||h.workflow_step}</b><time>{new Date(h.created_at).toLocaleString('ko-KR')}</time></div><small>처리자 {changeActor(h.actor_user_id)}</small>{h.note&&<p>{h.note}</p>}</div></div>)}</div><div className="modalActions readOnlyClose"><button className="secondary" onClick={()=>setWorkHistoryReservation(null)}><X size={15}/> 닫기</button></div></div></div>}
     {taskAssignModal&&<div className="modalBack"><form className={`modalBox taskAssignModal ${isModalDirty('assignment',taskAssignModal)?'hasUnsaved':''}`} onSubmit={saveTaskAssignment}><button type="button" className="close" onClick={()=>closeEditableModal('assignment',taskAssignModal)}><X/></button><h2>랜드사 업무 담당 지정</h2><p className="modalIntro">{taskAssignModal.customer_name} · {taskAssignModal.reservation_code} · {LAND_WORKFLOW_LABEL[taskAssignModal.workflow_step]}</p>{taskAssignModal.due_date_source==='auto'&&<div className="autoDueHint">자동 예정일 · {dueBasisLabel(taskAssignModal.due_date_basis)||'업무 기준일'} 기준. 날짜를 수정해 저장하면 수동 예정일로 전환됩니다.</div>}<div className="formGrid"><label>담당 직원<select value={taskAssignModal.assignee_user_id||''} onChange={e=>setTaskAssignModal({...taskAssignModal,assignee_user_id:e.target.value})}><option value="">미지정</option>{members.filter(x=>x.active!==false).map(x=><option key={x.user_id} value={x.user_id}>{x.display_name||x.email} · {roleLabel[x.role]||x.role}</option>)}</select></label><label>처리 예정일<input type="date" value={taskAssignModal.due_date||''} onChange={e=>setTaskAssignModal({...taskAssignModal,due_date:e.target.value})}/></label><label className="wide">업무 메모<textarea value={taskAssignModal.note||''} onChange={e=>setTaskAssignModal({...taskAssignModal,note:e.target.value})} placeholder="인수인계·확인사항"/></label></div><div className="modalActions"><button type="button" className="secondary" onClick={()=>closeEditableModal('assignment',taskAssignModal)}>닫기</button><button type="submit"><Save size={16}/> 저장</button></div></form></div>}
