@@ -632,3 +632,207 @@ body{background:var(--ail-bg)}
 
 /* Manual signup approval — no external email API. */
 .login .signupRequestButton{margin-top:8px;background:#f7fafc;color:#315e99;border:1px solid #d8e4f2}.login .signupRequestButton:hover{background:#eef5fc}.signupRequestsPanel{grid-column:1/-1}.signupRequestList{display:grid}.signupRequestRow{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid #edf1f5}.signupRequestRow:last-child{border-bottom:0}.signupRequestRow b,.signupRequestRow span{display:block}.signupRequestRow span{margin-top:4px;color:#718096;font-size:12px}.signupRequestActions{display:flex;align-items:center;justify-content:flex-end;gap:7px}.signupStatus{font-style:normal;font-size:12px;font-weight:800;color:#9a6d17;background:#fff7df;border-radius:999px;padding:5px 8px;white-space:nowrap}.signupStatus.approved{color:#167a48;background:#eaf8ef}.signupStatus.rejected{color:#b44141;background:#fff0f0}@media(max-width:780px){.signupRequestRow{align-items:flex-start;flex-direction:column}.signupRequestActions{width:100%;justify-content:flex-start}}
+
+/* =========================================================
+   신규 상담 상세 모달 전용 레이아웃 보완
+   기존 예약/결제/정산 모달에는 영향 없음
+========================================================= */
+
+.modalBack:has(.reservationForm > .modalIntro){
+  padding:24px;
+}
+
+.reservationForm:has(> .modalIntro){
+  width:min(760px, calc(100vw - 48px));
+  max-height:calc(100dvh - 48px);
+  padding:0;
+  border-radius:18px;
+  background:#fff;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  box-shadow:0 24px 70px rgba(15,23,42,.28);
+}
+
+/* 제목 */
+.reservationForm:has(> .modalIntro) > h2{
+  flex:0 0 auto;
+  margin:0;
+  padding:26px 64px 4px 28px;
+  color:#172033;
+  font-size:24px;
+  line-height:1.3;
+  letter-spacing:-.03em;
+}
+
+/* 접수번호 / 상담유형 */
+.reservationForm:has(> .modalIntro) > .modalIntro{
+  flex:0 0 auto;
+  margin:0;
+  padding:0 28px 20px;
+  border-bottom:1px solid #e7edf3;
+  color:#8291a4;
+  font-size:13px;
+  line-height:1.5;
+}
+
+/* 닫기 */
+.reservationForm:has(> .modalIntro) > .close{
+  top:20px;
+  right:20px;
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  color:#334155;
+  cursor:pointer;
+  transition:background .18s ease,color .18s ease;
+}
+
+.reservationForm:has(> .modalIntro) > .close:hover{
+  background:#f1f5f9;
+  color:#0f172a;
+}
+
+/* 정보 영역 */
+.reservationForm:has(> .modalIntro) > .modalGrid{
+  flex:1 1 auto;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  margin:0;
+  padding:22px 28px 24px;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  column-gap:18px;
+  row-gap:16px;
+}
+
+.reservationForm:has(> .modalIntro) > .modalGrid label{
+  gap:7px;
+  color:#556679;
+  font-size:12px;
+  font-weight:800;
+  line-height:1.4;
+}
+
+.reservationForm:has(> .modalIntro) > .modalGrid input,
+.reservationForm:has(> .modalIntro) > .modalGrid textarea{
+  min-height:44px;
+  padding:11px 12px;
+  border:1px solid #d9e3ed;
+  border-radius:10px;
+  background:#f8fafc;
+  color:#172033;
+  font-size:14px;
+  line-height:1.5;
+  font-weight:650;
+}
+
+.reservationForm:has(> .modalIntro) > .modalGrid textarea{
+  min-height:104px;
+  resize:vertical;
+}
+
+.reservationForm:has(> .modalIntro) > .modalGrid input:focus,
+.reservationForm:has(> .modalIntro) > .modalGrid textarea:focus{
+  outline:2px solid rgba(47,107,216,.18);
+  outline-offset:1px;
+  border-color:#8eb2ed;
+}
+
+/* 하단 버튼 */
+.reservationForm:has(> .modalIntro) > .modalActions{
+  flex:0 0 auto;
+  margin:0;
+  padding:16px 28px 20px;
+  display:flex;
+  justify-content:flex-end;
+  align-items:center;
+  gap:10px;
+  border-top:1px solid #e7edf3;
+  background:#fff;
+  box-shadow:0 -8px 20px rgba(15,23,42,.045);
+}
+
+.reservationForm:has(> .modalIntro) > .modalActions button{
+  min-height:42px;
+  padding:0 16px;
+  border-radius:10px;
+  font-size:13px;
+  font-weight:800;
+  white-space:nowrap;
+}
+
+.reservationForm:has(> .modalIntro) > .modalActions .secondary{
+  border:1px solid #e0e7ef;
+  background:#f3f6f9;
+  color:#334155;
+}
+
+.reservationForm:has(> .modalIntro) > .modalActions .primary{
+  background:#2f6bd8;
+  color:#fff;
+}
+
+.reservationForm:has(> .modalIntro) > .modalActions button:disabled{
+  cursor:not-allowed;
+  opacity:.55;
+}
+
+/* 태블릿 / 모바일 */
+@media (max-width:650px){
+  .modalBack:has(.reservationForm > .modalIntro){
+    padding:12px;
+    place-items:center;
+  }
+
+  .reservationForm:has(> .modalIntro){
+    width:100%;
+    max-height:calc(100dvh - 24px);
+    border-radius:16px;
+  }
+
+  .reservationForm:has(> .modalIntro) > h2{
+    padding:22px 56px 4px 20px;
+    font-size:21px;
+  }
+
+  .reservationForm:has(> .modalIntro) > .modalIntro{
+    padding:0 20px 17px;
+    font-size:12px;
+  }
+
+  .reservationForm:has(> .modalIntro) > .close{
+    top:15px;
+    right:14px;
+  }
+
+  .reservationForm:has(> .modalIntro) > .modalGrid{
+    padding:18px 20px 20px;
+    grid-template-columns:1fr;
+    gap:14px;
+  }
+
+  .reservationForm:has(> .modalIntro) > .modalGrid .span2{
+    grid-column:span 1;
+  }
+
+  .reservationForm:has(> .modalIntro) > .modalActions{
+    padding:14px 20px 18px;
+    display:grid;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+
+  .reservationForm:has(> .modalIntro) > .modalActions button{
+    width:100%;
+    min-height:44px;
+  }
+}
+
+@media (max-width:390px){
+  .reservationForm:has(> .modalIntro) > .modalActions{
+    grid-template-columns:1fr;
+  }
+}
