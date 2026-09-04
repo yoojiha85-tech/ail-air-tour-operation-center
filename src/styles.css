@@ -836,3 +836,162 @@ body{background:var(--ail-bg)}
     grid-template-columns:1fr;
   }
 }
+
+
+/* Compact reservation list UI — 2026-09-04 */
+@media (min-width:781px){
+  /* Main workspace: use more of the desktop width without changing structure. */
+  .shell main{
+    padding:24px 24px;
+  }
+
+  /* Sidebar keeps its width, but menu rhythm becomes tighter and consistent. */
+  .side{
+    padding:18px 12px;
+  }
+  .side nav{
+    gap:5px;
+    margin-top:22px;
+  }
+  .side nav button{
+    padding:10px 12px;
+    min-height:38px;
+    line-height:1.25;
+  }
+
+  /* Panel headers: compact but readable. */
+  .panelHead{
+    padding:14px 16px;
+  }
+  .panelHead h2{
+    margin:0 0 4px;
+    line-height:1.25;
+  }
+  .panelHead p{
+    line-height:1.35;
+  }
+
+  /*
+   * Reservation list only.
+   * :has(th:nth-child(12)) scopes these rules to the 12-column
+   * reservation table and leaves dashboard comparison/staff tables intact.
+   */
+  .tableWrap > table:has(thead th:nth-child(12)){
+    width:100%;
+    min-width:1450px;
+    table-layout:fixed;
+    border-collapse:collapse;
+  }
+
+  .tableWrap > table:has(thead th:nth-child(12)) th,
+  .tableWrap > table:has(thead th:nth-child(12)) td{
+    padding:8px 10px;
+    line-height:1.3;
+    vertical-align:middle;
+    font-size:12px;
+  }
+
+  .tableWrap > table:has(thead th:nth-child(12)) thead th{
+    height:43px;
+    padding-top:9px;
+    padding-bottom:9px;
+    white-space:nowrap;
+  }
+
+  .tableWrap > table:has(thead th:nth-child(12)) tbody tr{
+    height:50px;
+  }
+
+  /* Fixed-width operational columns. Product/region receives remaining width. */
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(1),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(1){width:100px}
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(2),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(2){width:130px}
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(4),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(4){width:102px}
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(5),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(5){width:56px}
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(6),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(6){width:82px}
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(7),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(7){width:86px}
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(8),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(8),
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(9),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(9),
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(10),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(10),
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(11),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(11){width:105px}
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(12),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(12){width:132px}
+
+  /* One-line fields requested by operations. */
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(1),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(2),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(4),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(5),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(6),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(7),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(8),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(9),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(10),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(11),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(12){
+    white-space:nowrap;
+  }
+
+  /* Product/region is the only column allowed to wrap; cap at two lines. */
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(3){
+    white-space:normal;
+    line-height:1.35;
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:2;
+    overflow:hidden;
+  }
+
+  /* Numeric columns align consistently to the right. */
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(8),
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(9),
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(10),
+  .tableWrap > table:has(thead th:nth-child(12)) th:nth-child(11),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(8),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(9),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(10),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(11){
+    text-align:right;
+  }
+
+  /* Keep status badges compact and on one line. */
+  .tableWrap > table:has(thead th:nth-child(12)) .passportBadge{
+    white-space:nowrap;
+    padding:4px 7px;
+    font-size:10px;
+  }
+
+  /* Detail / Edit / Delete stay in one horizontal row. */
+  .tableWrap > table:has(thead th:nth-child(12)) .actions{
+    display:flex;
+    align-items:center;
+    justify-content:flex-start;
+    flex-wrap:nowrap;
+    gap:5px;
+    white-space:nowrap;
+  }
+  .tableWrap > table:has(thead th:nth-child(12)) .actions button{
+    flex:0 0 auto;
+    min-width:36px;
+    min-height:30px;
+    padding:6px 7px;
+    line-height:1;
+    white-space:nowrap;
+  }
+}
+
+/* Allow horizontal scrolling only once the viewport becomes too narrow. */
+@media (max-width:1690px) and (min-width:781px){
+  .tableWrap{
+    overflow-x:auto;
+  }
+}
