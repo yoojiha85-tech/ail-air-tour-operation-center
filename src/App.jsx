@@ -26,7 +26,7 @@ const NAV = [
   ['package','해외패키지','reservation_view'],
   ['air','해외항공권','reservation_view'],
   ['group','국내·외 단체','reservation_view'],
-  ['airvi','✈ 2026년 항공 발권 VI','air_vi_view'],
+  ['airvi','✈ 항공 발권 VI','air_vi_view'],
   ['staff','⚙ 직원·권한 관리','staff_manage'],
 ]
 
@@ -1269,12 +1269,13 @@ async function goToTodayWork(x){
   if(!member)return <div className="center">{error||'권한 확인 중...'}</div>
 
   const nav=NAV.filter(n=>has(member,n[2]))
-  const activeTitle = page==='dashboard'?'통합 예약 현황':page==='calendar'?'출발 캘린더':page==='airvi'?`${year}년 항공 발권 VI`:page==='staff'?'직원·권한 관리':TYPE[page]
+  const safeYear = Number.isFinite(Number(year)) ? Number(year) : 2026
+  const activeTitle = page==='dashboard'?'통합 예약 현황':page==='calendar'?'출발 캘린더':page==='airvi'?`${safeYear}년 항공 발권 VI`:page==='staff'?'직원·권한 관리':TYPE[page]
 
   return <div className="shell">
     <aside className="side">
       <div className="brandBox"><b>A</b><div><strong>아일항공여행사</strong><span>통합 예약관리</span></div></div>
-      <nav>{nav.map(([id,label])=><button key={id} className={page===id?'active':''} onClick={()=>setPage(id)}>{label}</button>)}</nav>
+      <nav>{nav.map(([id,label])=><button key={id} className={page===id?'active':''} onClick={()=>setPage(id)}>{id==='airvi'?`✈ ${safeYear}년 항공 발권 VI`:label}</button>)}</nav>
       <div className="sideFoot"><span>{member.email}</span><button onClick={()=>supabase.auth.signOut()}><LogOut size={14}/>로그아웃</button></div>
     </aside>
     <main>
@@ -1423,7 +1424,7 @@ async function goToTodayWork(x){
 
       {page==='airvi'&&<section className="panel viPanel">
         <div className="panelHead"><div><small>MONTHLY INPUT</small><h2>월별 발권 VI 입력</h2><p>각 월의 발권총액과 VI 금액을 직접 입력해주세요.</p></div>
-          <label>확인 연도<select value={year} onChange={e=>setYear(Number(e.target.value))}>{yearOptions.map(y=><option key={y}>{y}년</option>)}</select></label></div>
+          <label>확인 연도<select value={safeYear} onChange={e=>{const nextYear=Number(e.target.value);if(Number.isFinite(nextYear))setYear(nextYear)}}>{yearOptions.map(y=><option key={y} value={y}>{y}년</option>)}</select></label></div>
         <div className="viGrid">{Array.from({length:12},(_,i)=>i+1).map(m=>{const v=vi.find(x=>x.year===Number(year)&&x.month===m)||{};return <div key={m}><h3>{m}월</h3><label>발권총액<input type="number" value={v.ticket_total||0} onChange={e=>updateVi(m,'ticket_total',e.target.value)}/></label><label>VI<input type="number" value={v.vi_amount||0} onChange={e=>updateVi(m,'vi_amount',e.target.value)}/></label></div>})}</div>
         <div className="viTotal"><b>합계</b><span>발권총액 {won(vi.filter(v=>v.year===Number(year)).reduce((a,v)=>a+num(v.ticket_total),0))}</span><span>VI {won(vi.filter(v=>v.year===Number(year)).reduce((a,v)=>a+num(v.vi_amount),0))}</span>{has(member,'air_vi_manage')&&<button className="primary" onClick={saveVi}>월별 내역 전체 저장</button>}</div>
       </section>}
