@@ -995,3 +995,25 @@ body{background:var(--ail-bg)}
     overflow-x:auto;
   }
 }
+
+
+/* Staff access hardening preview */
+.staffSecurityPanel{grid-column:1/-1;border-color:#b9d8ca;background:linear-gradient(135deg,#f7fcf9,#fff)}
+.staffSecurityPanel .panelHead small{display:block;margin-bottom:4px;color:#1d7a5b;font-size:10px;font-weight:900;letter-spacing:.08em}
+.staffSecuritySummary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.staffSecuritySummary>span{padding:14px;border:1px solid #dce7e1;border-radius:12px;background:#fff;color:#64746c;font-size:12px}
+.staffSecuritySummary b{display:block;margin-bottom:4px;color:#163f32;font-size:22px}
+.staffSecuritySummary .warn{border-color:#ecd3a6;background:#fffaf0;color:#8b6522}
+.staffInviteList{display:grid;gap:8px}
+.staffInviteRow{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 13px;border:1px solid #e0e7ec;border-radius:11px;background:#fff}
+.staffInviteRow>div{min-width:0}.staffInviteRow b,.staffInviteRow span,.staffInviteRow small{display:block}
+.staffInviteRow b{color:#16324c;font-size:13px}.staffInviteRow span{margin-top:3px;color:#6f7d89;font-size:11px}.staffInviteRow small{margin-top:5px;color:#47765f;font-size:10px}
+.staffInviteRow.expired{background:#f8f8f8;opacity:.72}.staffInviteRow.expired small{color:#9a5555}
+.staffInviteRow.risky{border-color:#e6c98e;background:#fffaf2}.staffInviteRow.risky small{color:#95691d}
+.permissionToggle.lockedPermission{background:#f3f5f7!important;border-color:#e2e6ea!important;color:#88939d!important;cursor:not-allowed!important}
+.permissionToggle.lockedPermission i{color:#7e8993!important}
+.memberRoleControl{margin:10px 0 12px;padding:10px 12px;border:1px solid #e0e7ed;border-radius:10px;background:#fafcfd}
+.memberRoleControl label{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11px;font-weight:800;color:#4d5e6d}
+.memberRoleControl select{min-width:130px;padding:7px 9px;border:1px solid #d7e0e8;border-radius:8px;background:#fff}
+.memberRoleControl p{margin:7px 0 0;color:#8a6a2e;font-size:10px}
+@media(max-width:760px){.staffSecuritySummary{grid-template-columns:1fr}.staffInviteRow{align-items:flex-start;flex-direction:column}.staffInviteRow button{width:100%}}
