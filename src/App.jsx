@@ -18,6 +18,7 @@ const PERM = {
   staff_manage:'직원 추가·권한 관리', ops_checklist_manage:'출발 전 체크 관리'
 }
 const defaultPerms = Object.fromEntries(Object.keys(PERM).map(k=>[k,false]))
+const INVITE_VALID_DAYS = 7
 
 const NAV = [
   ['dashboard','▦ 통합 대시보드','dashboard_view'],
@@ -37,7 +38,7 @@ const ymd=d=>d?String(d).slice(0,10):'-'
 const monthLabel=m=>`${m}월`
 const methodLabel={transfer:'입금',card:'카드',cash:'현금',mixed:'혼합'}
 const roleLabel={master:'마스터',manager:'관리자',staff:'직원',viewer:'조회전용'}
-const has=(m,k)=>m?.role==='master'||m?.permissions?.[k]===true
+const has=(m,k)=>m?.role==='master'||(k!=='staff_manage'&&m?.permissions?.[k]===true)
 const dayDiff=(from,to)=>{const a=new Date(from),b=new Date(to);if(Number.isNaN(a.getTime())||Number.isNaN(b.getTime()))return null;a.setHours(0,0,0,0);b.setHours(0,0,0,0);return Math.ceil((b-a)/86400000)}
 const passportStatus=r=>{if(r.passport_copy_received)return {label:'수령완료',tone:'ok'};const d=dayDiff(new Date(),r.departure_date);if(d===null)return {label:'확인대기',tone:'muted'};if(d<=30)return {label:d<0?'출발완료 미확인':'D-30 미수령',tone:'danger'};return {label:`D-${d}`,tone:'wait'}}
 const intermediateAirStatus=r=>{if(!r.intermediate_air_segment_exists)return {label:'해당없음',tone:'muted'};if(!r.intermediate_air_deposit_paid)return {label:'중도금 미결제',tone:'danger'};if(!r.intermediate_air_nonrefundable_notice_done)return {label:'환불불가 미안내',tone:'danger'};return {label:'안내·결제 완료',tone:'ok'}}
@@ -53,6 +54,16 @@ async function syncReservationToGoogleSheets(action,reservationId){
     console.error('Google Sheets reservation sync failed',error)
     alert('예약은 저장되었지만 Google Sheets 동기화에 실패했습니다. 잠시 후 다시 저장하거나 관리자에게 문의해 주세요.')
   }
+}
+
+
+async function staffAccess(action,payload={}){
+  const {data,error}=await supabase.functions.invoke('ops-staff-access-preview',{
+    body:{action,organization_id:ORG,...payload}
+  })
+  if(error)throw new Error(error.message||'직원 가입·권한 처리 서버에 연결하지 못했습니다.')
+  if(!data?.ok)throw new Error(data?.error||'직원 가입·권한 요청을 처리하지 못했습니다.')
+  return data
 }
 
 function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
@@ -106,20 +117,34 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
   }
   async function requestSignup(e){
     e.preventDefault();setError('');setMessage('')
+    const normalizedEmail=email.trim().toLowerCase()
     if(!signupName.trim())return setError('가입 요청자 이름을 입력해 주세요.')
-    const {error}=await supabase.from('ops_signup_requests').insert({organization_id:ORG,full_name:signupName.trim(),email:email.trim().toLowerCase()})
-    if(error){console.error('signup request failed',error);return setError('가입 요청을 접수하지 못했습니다. 잠시 후 다시 시도하거나 마스터 관리자에게 문의해 주세요.')}
-    setMessage('가입 요청을 접수했습니다. 마스터 관리자 승인 후 가입할 수 있습니다. 승인 안내는 관리자에게 직접 확인해 주세요.')
-    setScreen('login')
+    if(!normalizedEmail)return setError('이메일을 입력해 주세요.')
+    try{
+      const data=await staffAccess('submit_signup_request',{full_name:signupName.trim(),email:normalizedEmail})
+      setMessage(data.message||'가입 요청을 접수했습니다. MASTER 승인 후 가입할 수 있습니다.')
+      setScreen('login')
+    }catch(err){
+      console.error('signup request failed',err)
+      setError(err?.message||'가입 요청을 접수하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+    }
   }
   async function createApprovedAccount(e){
     e.preventDefault();setError('');setMessage('')
+    const normalizedEmail=email.trim().toLowerCase()
+    if(!normalizedEmail)return setError('승인받은 이메일을 입력해 주세요.')
     if(signupPassword.length<8)return setError('비밀번호는 8자 이상으로 입력해 주세요.')
     if(signupPassword!==signupPasswordConfirm)return setError('비밀번호와 비밀번호 확인이 일치하지 않습니다.')
-    const {error}=await supabase.auth.signUp({email:email.trim(),password:signupPassword,options:{emailRedirectTo:window.location.origin}})
-    if(error)return setError('계정을 만들지 못했습니다. 승인된 이메일인지 확인하거나 마스터 관리자에게 문의해 주세요.')
-    setMessage('계정 생성을 요청했습니다. 이메일 확인이 필요한 설정이면 수신 메일을 완료한 뒤 로그인해 주세요. 승인된 사전 등록 이메일만 서비스에 접근할 수 있습니다.')
-    setSignupPassword('');setSignupPasswordConfirm('');setScreen('login')
+    try{
+      const check=await staffAccess('check_invite',{email:normalizedEmail})
+      if(!check.allowed)return setError(check.message||'승인된 직원 등록을 확인하지 못했습니다.')
+      const {error}=await supabase.auth.signUp({email:normalizedEmail,password:signupPassword,options:{emailRedirectTo:window.location.origin}})
+      if(error)throw error
+      setMessage('계정 생성을 요청했습니다. 이메일 확인이 필요한 경우 확인을 완료한 뒤 로그인해 주세요.')
+      setSignupPassword('');setSignupPasswordConfirm('');setScreen('login')
+    }catch(err){
+      setError(err?.message||'계정을 만들지 못했습니다. MASTER 승인 상태를 확인해 주세요.')
+    }
   }
   if(passwordRecovery)return <div className="login"><form onSubmit={updatePassword}>
     <h1>새 비밀번호 설정</h1><p>안전한 새 비밀번호를 입력해 주세요.</p>
@@ -129,7 +154,7 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
     <button>비밀번호 변경</button>
   </form></div>
   if(screen==='signup')return <div className="login"><form onSubmit={requestSignup}>
-    <h1>회원가입 요청</h1><p>승인 전에는 계정이 생성되지 않습니다.</p>
+    <h1>직원 회원가입 요청</h1><p>MASTER 승인 전에는 계정이 생성되지 않습니다. 중복 요청은 자동으로 차단됩니다.</p>
     <input placeholder="이름" value={signupName} onChange={e=>setSignupName(e.target.value)} autoComplete="name" required/>
     <input placeholder="이메일" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required/>
     {error&&<div className="error">{error}</div>}
@@ -137,7 +162,7 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
     <button type="button" className="passwordResetButton" onClick={()=>{setError('');setScreen('login')}}>로그인으로 돌아가기</button>
   </form></div>
   if(screen==='createAccount')return <div className="login"><form onSubmit={createApprovedAccount}>
-    <h1>승인 후 계정 만들기</h1><p>관리자에게 승인 안내를 받은 이메일로 계정을 만드세요.</p>
+    <h1>승인 후 계정 만들기</h1><p>MASTER 승인 후 7일 이내, 승인받은 동일한 이메일로 계정을 만드세요.</p>
     <input placeholder="이메일" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="email" required/>
     <input placeholder="비밀번호 (8자 이상)" type="password" value={signupPassword} onChange={e=>setSignupPassword(e.target.value)} autoComplete="new-password" required/>
     <input placeholder="비밀번호 확인" type="password" value={signupPasswordConfirm} onChange={e=>setSignupPasswordConfirm(e.target.value)} autoComplete="new-password" required/>
@@ -154,7 +179,7 @@ function Login({passwordRecovery=false,onRecoveryComplete,notice=''}){
     <button>로그인</button>
     <button type="button" className="passwordResetButton" disabled={resetCooldown>0} onClick={sendPasswordReset}>{resetCooldown>0?`재설정 메일 재요청 (${resetWaitLabel} 후)`:"비밀번호를 잊으셨나요?"}</button>
     {resetCooldown>0&&<p className="resetCooldownHint">보안을 위해 재설정 메일은 잠시 후 다시 요청할 수 있습니다. 메일을 이미 요청했다면 받은편지함과 스팸함도 확인해 주세요.</p>}
-    <button type="button" className="signupRequestButton" onClick={()=>{setError('');setMessage('');setScreen('signup')}}>계정 확인 · 회원가입 요청</button>
+    <button type="button" className="signupRequestButton" onClick={()=>{setError('');setMessage('');setScreen('signup')}}>직원 회원가입 요청</button>
     <button type="button" className="signupRequestButton" onClick={()=>{setError('');setMessage('');setScreen('createAccount')}}>승인 후 계정 만들기</button>
   </form></div>
 }
@@ -170,6 +195,7 @@ export default function App(){
   const [expenses,setExpenses]=useState([])
   const [members,setMembers]=useState([])
   const [signupRequests,setSignupRequests]=useState([])
+  const [staffInvites,setStaffInvites]=useState([])
   const [landContracts,setLandContracts]=useState([])
   const [remitTemplates,setRemitTemplates]=useState([])
   const [remitTemplateItems,setRemitTemplateItems]=useState([])
@@ -260,7 +286,7 @@ export default function App(){
   },[])
   useEffect(()=>{ if(session?.user?.id) loadMember() },[session?.user?.id])
   useEffect(()=>{ if(member) loadAll() },[member?.user_id])
-  useEffect(()=>{ if(member&&page==='staff'&&has(member,'staff_manage'))loadSignupRequests() },[member?.user_id,page])
+  useEffect(()=>{ if(member&&page==='staff'&&member.role==='master'){loadSignupRequests();loadStaffInvites()} },[member?.user_id,page])
 
   async function loadMember(){
     const {data,error}=await supabase.from('ops_members').select('*')
@@ -306,6 +332,15 @@ export default function App(){
     const {data,error}=await supabase.from('ops_signup_requests').select('*').eq('organization_id',ORG).order('requested_at',{ascending:false})
     if(error){console.error('signup request load failed',error);return}
     setSignupRequests(data||[])
+  }
+  async function loadStaffInvites(){
+    try{
+      const data=await staffAccess('list_invites')
+      setStaffInvites(data.items||[])
+    }catch(err){
+      console.error('staff invite load failed',err)
+      setStaffInvites([])
+    }
   }
 
   const payMap=useMemo(()=>Object.fromEntries(rows.map(r=>[r.id,num(r.paid_amount)])),[rows])
@@ -520,51 +555,67 @@ export default function App(){
   }
 
   async function saveInvite(){
+    if(member?.role!=='master')return alert('MASTER만 직원 사전등록을 관리할 수 있습니다.')
     if(!invite.display_name||!invite.email)return alert('직원 이름과 이메일을 입력해 주세요.')
-    const {error}=await supabase.from('ops_staff_invites').insert({
-      organization_id:ORG,display_name:invite.display_name,email:invite.email,
-      role:invite.role,permissions:invite.permissions,active:true,invited_by:session.user.id
-    })
-    if(error)alert(error.message);else{alert('직원 사전 등록이 완료되었습니다.');setInvite({display_name:'',email:'',role:'staff',permissions:{...defaultPerms}})}
+    try{
+      const data=await staffAccess('save_invite',{
+        display_name:invite.display_name,email:invite.email,role:invite.role,permissions:invite.permissions
+      })
+      alert(data.message||'직원 사전 등록이 완료되었습니다.')
+      setInvite({display_name:'',email:'',role:'staff',permissions:{...defaultPerms}})
+      await loadStaffInvites()
+    }catch(err){alert(err?.message||'직원 사전등록을 저장하지 못했습니다.')}
   }
   async function approveSignupRequest(request){
-    if(!window.confirm(`${request.full_name} (${request.email})님의 가입 요청을 승인하시겠습니까?`))return
-    const {error:inviteError}=await supabase.from('ops_staff_invites').insert({
-      organization_id:ORG,display_name:request.full_name,email:request.email,
-      role:'staff',permissions:{...defaultPerms,dashboard_view:true,calendar_view:true,reservation_view:true},active:true,invited_by:session.user.id
-    })
-    if(inviteError)return alert(inviteError.message)
-    const {error}=await supabase.from('ops_signup_requests').update({status:'approved',approved_at:new Date().toISOString(),approved_by:session.user.id}).eq('id',request.id).eq('organization_id',ORG)
-    if(error)return alert(error.message)
-    await loadSignupRequests()
-    alert('가입 요청을 승인하고 직원 사전 등록을 완료했습니다. 요청자에게 가입 가능 여부를 직접 안내해 주세요.')
+    if(member?.role!=='master')return alert('MASTER만 가입 요청을 승인할 수 있습니다.')
+    if(!window.confirm(`${request.full_name} (${request.email})님의 가입 요청을 승인하시겠습니까?\n승인 후 7일 이내 계정을 만들어야 합니다.`))return
+    try{
+      const data=await staffAccess('approve_signup',{request_id:request.id})
+      await Promise.all([loadSignupRequests(),loadStaffInvites()])
+      alert(data.message||'가입 요청을 승인했습니다.')
+    }catch(err){alert(err?.message||'가입 요청 승인에 실패했습니다.')}
   }
   async function rejectSignupRequest(request){
+    if(member?.role!=='master')return alert('MASTER만 가입 요청을 반려할 수 있습니다.')
     if(!window.confirm(`${request.full_name}님의 가입 요청을 반려하시겠습니까?`))return
-    const {error}=await supabase.from('ops_signup_requests').update({status:'rejected',rejected_at:new Date().toISOString(),rejected_by:session.user.id}).eq('id',request.id).eq('organization_id',ORG)
-    if(error)return alert(error.message)
-    await loadSignupRequests()
+    try{
+      const data=await staffAccess('reject_signup',{request_id:request.id})
+      await loadSignupRequests()
+      alert(data.message||'가입 요청을 반려했습니다.')
+    }catch(err){alert(err?.message||'가입 요청 반려에 실패했습니다.')}
+  }
+  async function deactivateInvite(target){
+    if(member?.role!=='master')return
+    if(!window.confirm(`${target.display_name}님의 사전등록을 비활성화하시겠습니까?`))return
+    try{
+      const data=await staffAccess('deactivate_invite',{invite_id:target.id})
+      await loadStaffInvites()
+      alert(data.message||'사전등록을 비활성화했습니다.')
+    }catch(err){alert(err?.message||'사전등록 비활성화에 실패했습니다.')}
   }
   async function toggleMemberPermission(target,key){
-    if(!has(member,'staff_manage'))return alert('직원 권한 관리 권한이 없습니다.')
-    if(target.role==='master')return alert('마스터 권한은 이 화면에서 변경할 수 없습니다.')
+    if(member?.role!=='master')return alert('MASTER만 직원 권한을 관리할 수 있습니다.')
+    if(target.role==='master')return alert('마스터 권한은 이 화면에서 직접 수정할 수 없습니다.')
     if(target.user_id===session.user.id)return alert('본인 계정의 권한은 이 화면에서 변경할 수 없습니다.')
-    const permissions={...defaultPerms,...target.permissions,[key]:!target.permissions?.[key]}
-    const {error}=await supabase.from('ops_members').update({permissions}).eq('organization_id',ORG).eq('user_id',target.user_id)
-    if(error)return alert(error.message)
-    setMembers(prev=>prev.map(item=>item.user_id===target.user_id?{...item,permissions}:item))
+    if(key==='staff_manage')return alert('직원·권한 관리 기능은 MASTER 전용입니다.')
+    const permissions={...defaultPerms,...target.permissions,[key]:!target.permissions?.[key],staff_manage:false}
+    try{
+      const data=await staffAccess('update_member',{user_id:target.user_id,role:target.role,permissions})
+      setMembers(prev=>prev.map(item=>item.user_id===target.user_id?{...item,permissions}:item))
+      if(data.message)console.info(data.message)
+    }catch(err){alert(err?.message||'직원 권한 변경에 실패했습니다.')}
   }
-  async function changeMasterRole(target,nextRole){
-    if(member?.role!=='master')return alert('마스터 계정만 다른 마스터의 역할을 변경할 수 있습니다.')
-    if(target.user_id===session.user.id)return alert('본인 마스터 계정의 역할은 변경할 수 없습니다.')
-    if(target.role!=='master')return alert('마스터 계정만 역할 변경 대상으로 선택할 수 있습니다.')
+  async function changeMemberRole(target,nextRole){
+    if(member?.role!=='master')return alert('MASTER만 직원 역할을 변경할 수 있습니다.')
+    if(target.user_id===session.user.id)return alert('본인 MASTER 계정의 역할은 변경할 수 없습니다.')
     if(!['manager','staff','viewer'].includes(nextRole))return
-    if(!window.confirm(`${target.display_name||target.email}님의 역할을 ${roleLabel[nextRole]}으로 변경하시겠습니까? 변경 후에는 항목별 권한을 직접 설정할 수 있습니다.`))return
-    const permissions={...defaultPerms}
-    const {error}=await supabase.from('ops_members').update({role:nextRole,permissions}).eq('organization_id',ORG).eq('user_id',target.user_id)
-    if(error)return alert(error.message)
-    setMembers(prev=>prev.map(item=>item.user_id===target.user_id?{...item,role:nextRole,permissions}:item))
-    alert(`${target.display_name||target.email}님의 역할을 ${roleLabel[nextRole]}으로 변경했습니다. 아래 권한 토글에서 필요한 항목을 허용해 주세요.`)
+    if(!window.confirm(`${target.display_name||target.email}님의 역할을 ${roleLabel[nextRole]}으로 변경하시겠습니까?`))return
+    const permissions=target.role==='master'?{...defaultPerms}:{...defaultPerms,...target.permissions,staff_manage:false}
+    try{
+      const data=await staffAccess('update_member',{user_id:target.user_id,role:nextRole,permissions})
+      setMembers(prev=>prev.map(item=>item.user_id===target.user_id?{...item,role:nextRole,permissions}:item))
+      alert(data.message||'직원 역할을 변경했습니다.')
+    }catch(err){alert(err?.message||'직원 역할 변경에 실패했습니다.')}
   }
 
   const TODAY_WORK_LABEL={customer_balance:'고객 잔금',final_check:'최종체크',passport_copy:'여권사본',intermediate_air:'중간항공',land_work:'랜드사 업무'}
@@ -1430,16 +1481,34 @@ async function goToTodayWork(x){
       </section>}
 
       {page==='staff'&&<section className="staffGrid">
-        <div className="panel"><div className="panelHead"><div><h2>사전 직원 등록</h2><p>가입 전에 이메일과 기본 권한을 등록할 수 있습니다.</p></div></div>
+        <div className="panel staffSecurityPanel">
+          <div className="panelHead"><div><small>MASTER ONLY</small><h2>직원 가입 · 권한 보안</h2><p>직원관리·권한부여는 MASTER 전용입니다. 승인 사전등록은 7일간 유효하며 staff_manage는 일반 직원에게 부여되지 않습니다.</p></div><span className="badge">안전모드</span></div>
+          <div className="staffSecuritySummary">
+            <span><b>{signupRequests.filter(x=>x.status==='pending').length}</b> 가입 승인 대기</span>
+            <span><b>{staffInvites.filter(x=>!x.expired).length}</b> 유효 사전등록</span>
+            <span className={staffInvites.some(x=>(x.risky_permissions||[]).length)?'warn':''}><b>{staffInvites.filter(x=>(x.risky_permissions||[]).length).length}</b> 권한 점검 필요</span>
+          </div>
+        </div>
+
+        <div className="panel"><div className="panelHead"><div><h2>사전 직원 등록</h2><p>직원 이름·이메일·역할·기본 권한을 설정합니다. 동일 이메일은 새 승인정보로 갱신됩니다.</p></div><span className="badge">유효 7일</span></div>
           <div className="staffForm"><label>직원 이름<input value={invite.display_name} onChange={e=>setInvite({...invite,display_name:e.target.value})}/></label><label>이메일<input value={invite.email} onChange={e=>setInvite({...invite,email:e.target.value})}/></label><label>기본 역할<select value={invite.role} onChange={e=>setInvite({...invite,role:e.target.value})}><option value="staff">직원</option><option value="manager">관리자</option><option value="viewer">조회전용</option></select></label></div>
-          <div className="permGrid">{Object.entries(PERM).map(([k,l])=><button type="button" key={k} className={`permissionToggle ${invite.permissions[k]?'enabled':''}`} aria-pressed={!!invite.permissions[k]} onClick={()=>setInvite({...invite,permissions:{...invite.permissions,[k]:!invite.permissions[k]}})}><span>{l}</span><i>{invite.permissions[k]?'허용':'미허용'}</i></button>)}</div>
-          <button className="wide primary" onClick={saveInvite}>직원 사전 등록</button>
+          <div className="permGrid">{Object.entries(PERM).map(([k,l])=>{const masterOnly=k==='staff_manage';return <button type="button" key={k} disabled={masterOnly} className={`permissionToggle ${invite.permissions[k]?'enabled':''} ${masterOnly?'lockedPermission':''}`} aria-pressed={!!invite.permissions[k]} onClick={()=>!masterOnly&&setInvite({...invite,permissions:{...invite.permissions,[k]:!invite.permissions[k]}})}><span>{l}</span><i>{masterOnly?'MASTER 전용':invite.permissions[k]?'허용':'미허용'}</i></button>})}</div>
+          <button className="wide primary" onClick={saveInvite}>직원 사전 등록 · 7일 승인</button>
         </div>
-        <div className="panel"><div className="panelHead"><div><h2>등록 직원</h2><p>권한 토글을 눌러 즉시 부여하거나 해제할 수 있습니다.</p></div><span className="badge">{members.filter(m=>m.active).length}명 사용 중</span></div>
-          <div>{members.map(m=><div className="staffPermissionCard" key={m.user_id}><div className="staffRow"><div><b>{m.display_name||m.email}</b><span>{m.email}</span></div><div>{roleLabel[m.role]||m.role}</div></div>{m.role==='master'?(member?.role==='master'&&m.user_id!==session.user.id?<div className="masterRoleControl"><label>역할 변경<select value="" onChange={e=>{if(e.target.value)changeMasterRole(m,e.target.value)}}><option value="" disabled>직원 역할 선택</option><option value="manager">관리자</option><option value="staff">직원</option><option value="viewer">조회전용</option></select></label><p>역할을 변경하면 마스터 권한이 해제되고, 아래 목록에서 항목별 권한을 설정할 수 있습니다.</p></div>:<p className="staffPermissionNotice">{m.user_id===session.user.id?'본인 마스터 계정의 역할은 변경할 수 없습니다.':'마스터는 모든 권한을 가집니다.'}</p>):<div className="memberPermGrid">{Object.entries(PERM).map(([k,l])=>{const enabled=!!m.permissions?.[k];const locked=m.user_id===session.user.id;return <button type="button" key={k} className={`permissionToggle ${enabled?'enabled':''}`} aria-pressed={enabled} disabled={locked} onClick={()=>toggleMemberPermission(m,k)}><span>{l}</span><i>{enabled?'허용':'미허용'}</i></button>})}</div>}</div>)}</div>
+
+        <div className="panel"><div className="panelHead"><div><h2>사전등록 대기</h2><p>계정 생성 전 승인된 이메일입니다. 7일이 지나면 새로 승인하는 것을 권장합니다.</p></div><span className="badge">{staffInvites.length}건</span></div>
+          <div className="staffInviteList">{staffInvites.length===0?<div className="taskEmpty">활성 사전등록이 없습니다.</div>:staffInvites.map(x=>{const risky=(x.risky_permissions||[]).length>0;const expiry=new Date(x.expires_at);const remain=Math.max(0,Math.ceil((expiry-new Date())/86400000));return <div className={`staffInviteRow ${x.expired?'expired':''} ${risky?'risky':''}`} key={x.id}><div><b>{x.display_name}</b><span>{x.email} · {roleLabel[x.role]||x.role}</span><small>{x.expired?'유효기간 만료':`D-${remain} · ${expiry.toLocaleDateString('ko-KR')}까지`}{risky?' · ⚠ 관리권한 포함':''}</small></div><button className="secondary mini" onClick={()=>deactivateInvite(x)}>비활성화</button></div>})}</div>
         </div>
-        <div className="panel signupRequestsPanel"><div className="panelHead"><div><h2>회원가입 요청</h2><p>외부 이메일 API 없이 마스터가 직접 승인합니다. 승인 후 요청자에게 가입 가능 여부를 안내해 주세요.</p></div><span className="badge">대기 {signupRequests.filter(x=>x.status==='pending').length}건</span></div>
-          <div className="signupRequestList">{signupRequests.length===0?<div className="taskEmpty">가입 요청이 없습니다.</div>:signupRequests.map(request=><div className="signupRequestRow" key={request.id}><div><b>{request.full_name}</b><span>{request.email} · 요청 {new Date(request.requested_at).toLocaleString('ko-KR')}</span></div><div className="signupRequestActions"><em className={`signupStatus ${request.status}`}>{request.status==='approved'?'승인됨':request.status==='rejected'?'반려됨':'승인 대기'}</em>{request.status==='pending'&&<><button className="secondary mini" onClick={()=>rejectSignupRequest(request)}>반려</button><button className="primary mini" onClick={()=>approveSignupRequest(request)}>승인</button></>}</div></div>)}</div>
+
+        <div className="panel"><div className="panelHead"><div><h2>등록 직원</h2><p>MASTER가 역할과 업무권한을 관리합니다. staff_manage는 MASTER 전용으로 고정됩니다.</p></div><span className="badge">{members.filter(m=>m.active).length}명 사용 중</span></div>
+          <div>{members.map(m=><div className="staffPermissionCard" key={m.user_id}><div className="staffRow"><div><b>{m.display_name||m.email}</b><span>{m.email}</span></div><div>{roleLabel[m.role]||m.role}</div></div>
+            {m.user_id===session.user.id?<p className="staffPermissionNotice">본인 MASTER 계정은 이 화면에서 변경할 수 없습니다.</p>:<div className="memberRoleControl"><label>역할<select value={m.role==='master'?'':m.role} onChange={e=>changeMemberRole(m,e.target.value)}><option value="" disabled>{m.role==='master'?'MASTER 해제 역할 선택':'역할 선택'}</option><option value="manager">관리자</option><option value="staff">직원</option><option value="viewer">조회전용</option></select></label>{m.role==='master'&&<p>다른 MASTER를 변경하면 MASTER 권한이 해제됩니다.</p>}</div>}
+            {m.role==='master'?<p className="staffPermissionNotice">MASTER는 전체 권한을 가집니다.</p>:<div className="memberPermGrid">{Object.entries(PERM).map(([k,l])=>{const masterOnly=k==='staff_manage';const enabled=masterOnly?false:!!m.permissions?.[k];return <button type="button" key={k} className={`permissionToggle ${enabled?'enabled':''} ${masterOnly?'lockedPermission':''}`} aria-pressed={enabled} disabled={masterOnly||m.user_id===session.user.id} onClick={()=>toggleMemberPermission(m,k)}><span>{l}</span><i>{masterOnly?'MASTER 전용':enabled?'허용':'미허용'}</i></button>})}</div>}
+          </div>)}</div>
+        </div>
+
+        <div className="panel signupRequestsPanel"><div className="panelHead"><div><h2>회원가입 요청</h2><p>직원 요청을 MASTER가 직접 승인합니다. 중복 요청은 서버에서 차단됩니다.</p></div><span className="badge">대기 {signupRequests.filter(x=>x.status==='pending').length}건</span></div>
+          <div className="signupRequestList">{signupRequests.length===0?<div className="taskEmpty">가입 요청이 없습니다.</div>:signupRequests.map(request=><div className="signupRequestRow" key={request.id}><div><b>{request.full_name}</b><span>{request.email} · 요청 {new Date(request.requested_at).toLocaleString('ko-KR')}</span></div><div className="signupRequestActions"><em className={`signupStatus ${request.status}`}>{request.status==='approved'?'승인됨':request.status==='rejected'?'반려됨':'승인 대기'}</em>{request.status==='pending'&&<><button className="secondary mini" onClick={()=>rejectSignupRequest(request)}>반려</button><button className="primary mini" onClick={()=>approveSignupRequest(request)}>승인 · 7일</button></>}</div></div>)}</div>
         </div>
       </section>}
     </main>
