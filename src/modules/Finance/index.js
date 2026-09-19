@@ -31,3 +31,5 @@ export function calculateFinanceSummary({
     margin,
   }
 }
+
+export { default as FinanceSummary } from './FinanceSummary.jsx'
