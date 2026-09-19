@@ -1,5 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './lib/supabase'
+import { ConsultationModal } from './modules/Consultation'
+import { QuoteWorkspace } from './modules/Quote'
+import { ContractWorkspace } from './modules/Contract'
+import { ReservationCaseControlCenter } from './modules/ReservationCase'
+import { FinanceSummary } from './modules/Finance'
+import './modules/erp.css'
 import {
   LayoutDashboard, CalendarDays, Plane, Users, ShieldCheck, LogOut,
   Plus, RefreshCw, Save, X, ChevronLeft, ChevronRight
@@ -592,8 +598,21 @@ export default function App(){
     if(x.due_date){const d=dayDiff(new Date(),x.due_date);return d>=0?`D-${d}`:ymd(x.due_date)}
     return '확인필요'
   }
-  const DETAIL_TABS=[['overview','개요'],['travelers','고객·여행자'],['payments','입금·환불'],['expenses','지출·송금'],['checklist','출발 체크'],['settlement','정산·손익'],['history','메모·변경이력']]
+  const DETAIL_TABS=[['overview','개요'],['quote','견적'],['contract','계약'],['case','CASE'],['finance','ERP 손익'],['travelers','고객·여행자'],['payments','입금·환불'],['expenses','지출·송금'],['checklist','출발 체크'],['settlement','정산·손익'],['history','메모·변경이력']]
   function openDetail(r,tab='overview'){if(!r)return;setDetailReservation(r);setDetailTab(tab)}
+  async function refreshDetailReservation(){
+    const currentId=detailReservation?.id
+    await loadAll()
+    if(!currentId)return
+    const [baseResult,viewResult]=await Promise.all([
+      supabase.from('ops_reservations').select('*').eq('organization_id',ORG).eq('id',currentId).maybeSingle(),
+      supabase.from('ops_dashboard_reservations').select('*').eq('organization_id',ORG).eq('id',currentId).maybeSingle()
+    ])
+    const error=baseResult.error||viewResult.error
+    if(error){console.error('CASE refresh failed',error);return}
+    const merged={...(viewResult.data||{}),...(baseResult.data||{})}
+    if(merged.id)setDetailReservation(prev=>prev&&prev.id===currentId?{...prev,...merged}:prev)
+  }
   function reservationItems(list,id){return list.filter(x=>x.reservation_id===id)}
   function paymentNet(id){return reservationItems(payments,id).reduce((a,p)=>a+(p.payment_type==='refund'?-num(p.amount):num(p.amount)),0)}
   function expensePaidTotal(id){return reservationItems(expenses,id).filter(x=>x.status==='paid'||x.paid_date).reduce((a,x)=>a+num(x.amount_krw),0)}
@@ -1444,154 +1463,14 @@ async function goToTodayWork(x){
       </section>}
     </main>
 
-     {consultationModal&&
-      <div className="modalBack">
-        <div className="modalBox reservationForm">
-          <button
-            type="button"
-            className="close"
-            onClick={()=>setConsultationModal(null)}
-          >
-            <X/>
-          </button>
-
-          <h2>신규 상담 상세</h2>
-
-          <p className="modalIntro">
-            {consultationModal.request_code} · {consultationModal.request_type}
-          </p>
-
-          <div className="modalGrid">
-            <label>
-              고객명
-              <input readOnly value={consultationModal.customer_name||''}/>
-            </label>
-
-            <label>
-              전화번호
-              <input readOnly value={consultationModal.phone||''}/>
-            </label>
-
-            <label>
-              희망여행지
-              <input readOnly value={consultationModal.destination||''}/>
-            </label>
-
-            <label>
-              출발예정일
-              <input
-                readOnly
-                value={
-                  ymd(consultationModal.departure_date)==='-'
-                    ? ''
-                    : ymd(consultationModal.departure_date)
-                }
-              />
-            </label>
-
-            <label>
-              여행인원
-              <input readOnly value={consultationModal.traveler_count||''}/>
-            </label>
-
-            <label>
-              예상예산
-              <input readOnly value={consultationModal.budget||''}/>
-            </label>
-
-            <label>
-              예식일
-              <input
-                readOnly
-                value={
-                  ymd(consultationModal.wedding_date)==='-'
-                    ? ''
-                    : ymd(consultationModal.wedding_date)
-                }
-              />
-            </label>
-
-            <label>
-              상담상태
-              <input
-                readOnly
-                value={
-                  ({
-                    new:'신규',
-                    contacting:'상담중',
-                    quoted:'견적발송',
-                    contracted:'계약완료',
-                    converted:'예약전환',
-                    hold:'보류',
-                    closed:'종료'
-                  })[consultationModal.status]
-                  ||consultationModal.status
-                  ||''
-                }
-              />
-            </label>
-
-            <label className="span2">
-              요청사항
-              <textarea
-                rows="4"
-                readOnly
-                value={consultationModal.request_memo||'별도 요청사항 없음'}
-              />
-            </label>
-          </div>
-
-          <div className="modalActions">
-            <button
-              type="button"
-              className="secondary"
-              onClick={()=>setConsultationModal(null)}
-            >
-              닫기
-            </button>
-
-            <button
-              type="button"
-              className="secondary"
-              onClick={()=>{
-                window.location.href=
-                  `tel:${String(consultationModal.phone||'').replace(/[^0-9+]/g,'')}`
-              }}
-            >
-              전화하기
-            </button>
-
-            <button
-              type="button"
-              disabled={
-                consultationModal.status!=='new'
-                ||!has(member,'reservation_edit')
-              }
-              onClick={()=>startConsultation(consultationModal)}
-            >
-              {consultationModal.status==='new'
-                ? '상담 시작'
-                : '상담 진행중'}
-            </button>
-
-            <button
-              type="button"
-              className="primary"
-              disabled={
-                !!consultationModal.reservation_id
-                ||!has(member,'reservation_create')
-                ||!has(member,'reservation_edit')
-              }
-              onClick={()=>convertConsultation(consultationModal)}
-            >
-              {consultationModal.reservation_id
-                ? '예약 연결완료'
-                : '예약으로 전환'}
-            </button>
-          </div>
-        </div>
-      </div>
-    }
+    <ConsultationModal
+      consultation={consultationModal}
+      canEdit={has(member,'reservation_edit')}
+      canCreate={has(member,'reservation_create')}
+      onClose={()=>setConsultationModal(null)}
+      onStart={startConsultation}
+      onConvert={convertConsultation}
+    />
     {taskCompleteModal&&<div className="modalBack"><form className={`modalBox taskCompleteModal ${isModalDirty('completion',taskCompleteModal)?'hasUnsaved':''}`} onSubmit={completeLandTask}><button type="button" className="close" onClick={()=>closeEditableModal('completion',taskCompleteModal)}><X/></button><h2>랜드사 업무 처리완료</h2><p className="modalIntro">{taskCompleteModal.customer_name} · {taskCompleteModal.reservation_code} · {LAND_WORKFLOW_LABEL[taskCompleteModal.workflow_step]}</p><div className="completionCaution">업무 처리완료는 직원 처리 기록입니다. 실제 계약·신청금·중도금·잔금 상태는 계약·송금 데이터가 변경될 때만 다음 단계로 이동합니다.</div><label>완료 메모<textarea value={taskCompleteModal.completion_note||''} onChange={e=>setTaskCompleteModal({...taskCompleteModal,completion_note:e.target.value})} placeholder="처리 내용·확인사항·인수인계 메모"/></label><div className="modalActions"><button type="button" className="secondary" onClick={()=>closeEditableModal('completion',taskCompleteModal)}>닫기</button><button type="submit"><Save size={16}/> 처리완료</button></div></form></div>}
     {workHistoryReservation&&<div className="modalBack"><div className="modalBox workHistoryModal"><button type="button" className="close" onClick={()=>setWorkHistoryReservation(null)}><X/></button><h2>랜드사 업무 처리이력</h2><p className="modalIntro">{rows.find(r=>r.id===workHistoryReservation)?.customer_name||rows.find(r=>r.id===workHistoryReservation)?.reservation_code||'예약'}</p><div className="workHistoryList">{workHistoryForReservation(workHistoryReservation).length===0?<div className="taskEmpty">저장된 업무 처리이력이 없습니다.</div>:workHistoryForReservation(workHistoryReservation).map(h=><div className={`workHistoryItem ${h.action}`} key={h.id}><span className="historyDot"/><div><div className="workHistoryHead"><b>{h.action==='complete'?'처리완료':h.action==='reopen'?'재오픈':h.action==='create'?'업무 생성':'업무 수정'} · {LAND_WORKFLOW_LABEL[h.workflow_step]||h.workflow_step}</b><time>{new Date(h.created_at).toLocaleString('ko-KR')}</time></div><small>처리자 {changeActor(h.actor_user_id)}</small>{h.note&&<p>{h.note}</p>}</div></div>)}</div><div className="modalActions readOnlyClose"><button className="secondary" onClick={()=>setWorkHistoryReservation(null)}><X size={15}/> 닫기</button></div></div></div>}
     {taskAssignModal&&<div className="modalBack"><form className={`modalBox taskAssignModal ${isModalDirty('assignment',taskAssignModal)?'hasUnsaved':''}`} onSubmit={saveTaskAssignment}><button type="button" className="close" onClick={()=>closeEditableModal('assignment',taskAssignModal)}><X/></button><h2>랜드사 업무 담당 지정</h2><p className="modalIntro">{taskAssignModal.customer_name} · {taskAssignModal.reservation_code} · {LAND_WORKFLOW_LABEL[taskAssignModal.workflow_step]}</p>{taskAssignModal.due_date_source==='auto'&&<div className="autoDueHint">자동 예정일 · {dueBasisLabel(taskAssignModal.due_date_basis)||'업무 기준일'} 기준. 날짜를 수정해 저장하면 수동 예정일로 전환됩니다.</div>}<div className="formGrid"><label>담당 직원<select value={taskAssignModal.assignee_user_id||''} onChange={e=>setTaskAssignModal({...taskAssignModal,assignee_user_id:e.target.value})}><option value="">미지정</option>{members.filter(x=>x.active!==false).map(x=><option key={x.user_id} value={x.user_id}>{x.display_name||x.email} · {roleLabel[x.role]||x.role}</option>)}</select></label><label>처리 예정일<input type="date" value={taskAssignModal.due_date||''} onChange={e=>setTaskAssignModal({...taskAssignModal,due_date:e.target.value})}/></label><label className="wide">업무 메모<textarea value={taskAssignModal.note||''} onChange={e=>setTaskAssignModal({...taskAssignModal,note:e.target.value})} placeholder="인수인계·확인사항"/></label></div><div className="modalActions"><button type="button" className="secondary" onClick={()=>closeEditableModal('assignment',taskAssignModal)}>닫기</button><button type="submit"><Save size={16}/> 저장</button></div></form></div>}
@@ -1646,6 +1525,10 @@ async function goToTodayWork(x){
       <div className="detailHero"><div><small>{detailReservation.reservation_code} · {TYPE[detailReservation.product_type]||detailReservation.product_type}</small><h2>{detailReservation.customer_name} · {detailReservation.title||detailReservation.destination}</h2><p>{detailReservation.destination||'-'} · 출발 {ymd(detailReservation.departure_date)} · {detailReservation.traveler_count||0}명 · 담당 {detailReservation.manager_name||'미지정'}</p></div><div className="detailHeroActions">{has(member,'reservation_edit')&&<button className="secondary" onClick={()=>{setDetailReservation(null);openEdit(detailReservation)}}>예약 수정</button>}<span className={`statusPill ${detailReservation.status||'confirmed'}`}>{detailReservation.status||'confirmed'}</span></div></div>
       <div className="detailTabs">{DETAIL_TABS.map(([id,label])=><button key={id} className={detailTab===id?'active':''} onClick={()=>setDetailTab(id)}>{label}</button>)}</div>
       <div className="detailBody">
+        {detailTab==='quote'&&<QuoteWorkspace reservation={detailReservation} organizationId={ORG} userId={session.user.id} canEdit={has(member,'reservation_edit')} onChanged={refreshDetailReservation}/>} 
+        {detailTab==='contract'&&<ContractWorkspace reservation={detailReservation} organizationId={ORG} userId={session.user.id} canEdit={has(member,'reservation_edit')} onChanged={refreshDetailReservation}/>} 
+        {detailTab==='case'&&<ReservationCaseControlCenter reservation={detailReservation} organizationId={ORG} userId={session.user.id} canEdit={has(member,'reservation_edit')} onChanged={refreshDetailReservation}/>} 
+        {detailTab==='finance'&&<FinanceSummary reservation={detailReservation} payments={payments} expenses={expenses} canView={has(member,'settlement_view')}/>} 
         {detailTab==='overview'&&<div className="detailGrid">
           <section className="detailCard span2"><h3>예약 핵심정보</h3><div className="infoGrid"><div><span>고객</span><b>{detailReservation.customer_name}</b></div><div><span>연락처</span><b>{detailReservation.customer_phone||'-'}</b></div><div><span>상품</span><b>{detailReservation.title||'-'}</b></div><div><span>지역</span><b>{detailReservation.destination||'-'}</b></div><div><span>출발</span><b>{ymd(detailReservation.departure_date)}</b></div><div><span>귀국</span><b>{ymd(detailReservation.return_date)}</b></div><div><span>랜드사</span><b>{detailReservation.partner_name||'-'}</b></div><div><span>담당자</span><b>{detailReservation.manager_name||'-'}</b></div></div></section>
           <section className="detailCard"><div className="detailSectionHead"><h3>항공 예약</h3>{has(member,'reservation_edit')&&<button className="secondary mini" onClick={()=>openEntityModal('air')}>+ 항공</button>}</div>{reservationItems(airBookings,detailReservation.id).length===0?<div className="emptyMini">등록된 항공 예약 없음</div>:reservationItems(airBookings,detailReservation.id).map(a=><div className="miniRecord" key={a.id}><div className="recordLine"><b>{a.airline||'-'} {a.flight_no||''}</b>{has(member,'reservation_edit')&&<span className="recordActions"><button onClick={()=>openEntityModal('air',a)}>수정</button><button className="dangerText" onClick={()=>deleteOperationalEntity('air',a)}>삭제</button></span>}</div><span>{({international:'국제선',domestic:'국내선',intermediate:'중간항공'})[a.segment_role||a.segment_type]||'국제선'} · {a.departure_airport||'-'} → {a.arrival_airport||'-'}</span><small>{a.departure_at?new Date(a.departure_at).toLocaleString('ko-KR'):'일정 미등록'} · PNR {a.pnr||'-'} · {a.ticketed?'발권완료':'미발권'}</small></div>)}</section>
