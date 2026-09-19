@@ -1,7 +1,32 @@
 import { useMemo } from 'react'
-import { calculateFinanceSummary } from './index.js'
-
 const num = value => Number(value || 0)
+
+function calculateFinanceSummary({
+  saleAmount = 0,
+  finalSaleAmount = null,
+  exchangeAdjustmentAmount = 0,
+  additionalAmount = 0,
+  discountAmount = 0,
+  payments = [],
+  expenses = [],
+} = {}) {
+  const calculatedSale =
+    num(saleAmount) +
+    num(exchangeAdjustmentAmount) +
+    num(additionalAmount) -
+    num(discountAmount)
+  const finalSale =
+    finalSaleAmount === null || finalSaleAmount === undefined
+      ? calculatedSale
+      : num(finalSaleAmount)
+  const received = payments.reduce((sum, item) =>
+    sum + (item.payment_type === 'refund' ? -num(item.amount) : num(item.amount)), 0)
+  const totalCost = expenses.reduce((sum, item) => sum + num(item.amount_krw), 0)
+  const receivable = Math.max(0, finalSale - received)
+  const profit = finalSale - totalCost
+  const margin = finalSale > 0 ? (profit / finalSale) * 100 : 0
+  return { finalSale, received, receivable, totalCost, profit, margin }
+}
 const won = value => `${num(value).toLocaleString('ko-KR')}원`
 
 const EXPENSE_LABEL = {
