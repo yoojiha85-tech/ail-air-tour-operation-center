@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import { QUOTE_STATUS } from './index.js'
+const QUOTE_STATUS = {
+  draft: '작성중',
+  sent: '견적발송',
+  selected: '고객선택',
+  expired: '만료',
+  cancelled: '취소',
+}
 
 const num = value => Number(value || 0)
 const won = value => `${num(value).toLocaleString('ko-KR')}원`
