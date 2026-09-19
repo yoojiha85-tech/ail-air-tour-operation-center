@@ -4,6 +4,7 @@ const CONTRACT_STATUS = {
   draft: '작성중',
   sent: '발송',
   signed: '계약완료',
+  superseded: '과거계약',
   cancelled: '취소',
 }
 
@@ -75,7 +76,10 @@ export default function ContractWorkspace({
     load()
   }, [reservation?.id, organizationId])
 
-  const latestContract = useMemo(() => contracts[0] || null, [contracts])
+  const activeContract = useMemo(() => contracts.find(row => row.is_active) || null, [contracts])
+  const latestContract = useMemo(() => activeContract || contracts[0] || null, [activeContract, contracts])
+  const currentSale = num(reservation.final_sale_amount ?? reservation.sale_amount)
+  const contractGap = latestContract ? currentSale - num(latestContract.total_amount) : 0
 
   function openContractForm() {
     if (!selectedQuote || !selectedVersion) return
@@ -145,6 +149,8 @@ export default function ContractWorkspace({
           quote_version: selectedVersion.version_no,
           quote_total: selectedVersion.total_amount,
         },
+        source_type: 'workspace',
+        is_active: false,
         created_by: userId,
       })
       .select('*')
@@ -155,20 +161,6 @@ export default function ContractWorkspace({
       setSaving(false)
       return
     }
-
-    const reservationUpdate = await supabase
-      .from('ops_reservations')
-      .update({
-        active_contract_id: created.data.id,
-        case_stage: 'contract',
-        contract_date: contractDate,
-        sale_amount: num(form.total_amount),
-        balance_due_date: form.balance_due_date || null,
-      })
-      .eq('organization_id', organizationId)
-      .eq('id', reservation.id)
-
-    if (reservationUpdate.error) setError(reservationUpdate.error.message)
 
     setForm(null)
     setSaving(false)
@@ -182,11 +174,33 @@ export default function ContractWorkspace({
     const now = new Date().toISOString()
     const today = now.slice(0, 10)
 
+    const deactivated = await supabase
+      .from('ops_contracts')
+      .update({
+        is_active: false,
+        status: 'superseded',
+        superseded_at: now,
+        superseded_reason: '새 계약 버전 활성화',
+      })
+      .eq('organization_id', organizationId)
+      .eq('reservation_id', reservation.id)
+      .eq('is_active', true)
+      .neq('id', contract.id)
+
+    if (deactivated.error) {
+      setError(deactivated.error.message)
+      setSaving(false)
+      return
+    }
+
     const signed = await supabase
       .from('ops_contracts')
       .update({
         status: 'signed',
+        is_active: true,
         signed_at: now,
+        superseded_at: null,
+        superseded_reason: null,
         contract_date: contract.contract_date || today,
       })
       .eq('organization_id', organizationId)
@@ -249,6 +263,13 @@ export default function ContractWorkspace({
         </div>
       )}
 
+      {latestContract && contractGap !== 0 && (
+        <div className="erpNotice">
+          계약 스냅샷 {won(latestContract.total_amount)}과 현재 운영 판매가 {won(currentSale)}가 {won(Math.abs(contractGap))} 차이납니다.
+          계약 이후 항공·옵션·환율·추가금 변경 여부를 CASE 자료대조에서 확인하세요.
+        </div>
+      )}
+
       {selectedQuote && selectedVersion && (
         <div className="erpSelectedQuote">
           <div><span>선택견적</span><b>{selectedQuote.title} · V{selectedVersion.version_no}</b></div>
@@ -258,11 +279,11 @@ export default function ContractWorkspace({
 
       <div className="erpContractList">
         {contracts.map(contract => (
-          <article className={`erpContractCard ${contract.status === 'signed' ? 'signed' : ''}`} key={contract.id}>
+          <article className={`erpContractCard ${contract.is_active ? 'signed' : ''} ${contract.status === 'superseded' ? 'superseded' : ''}`} key={contract.id}>
             <div className="erpCardTop">
               <div>
-                <span>{contract.contract_code} · V{contract.version_no}</span>
-                <h4>{contract.status === 'signed' ? '계약 완료' : '계약서 초안'}</h4>
+                <span>{contract.contract_code} · V{contract.version_no}{contract.source_type === 'legacy_xlsx' ? ' · XLSX 이관' : ''}</span>
+                <h4>{contract.is_active ? '현재 활성 계약' : contract.status === 'superseded' ? '과거 계약 스냅샷' : contract.status === 'signed' ? '계약 완료' : '계약서 초안'}</h4>
               </div>
               <em className={`erpStatus ${contract.status}`}>
                 {CONTRACT_STATUS[contract.status] || contract.status}
@@ -276,9 +297,9 @@ export default function ContractWorkspace({
               <div><span>잔금</span><b>{won(contract.balance_amount)}</b></div>
             </div>
 
-            <p>잔금일 {contract.balance_due_date || '-'} · 계약일 {contract.contract_date || '-'}</p>
+            <p>잔금일 {contract.balance_due_date || '-'} · 계약일 {contract.contract_date || '-'}{contract.source_file_name ? ` · 출처 ${contract.source_file_name}` : ''}</p>
 
-            {canEdit && contract.status !== 'signed' && (
+            {canEdit && !contract.is_active && !['signed','superseded','cancelled'].includes(contract.status) && (
               <div className="erpCardActions">
                 <button type="button" className="primary mini" disabled={saving} onClick={() => signContract(contract)}>
                   계약 완료 처리
@@ -326,8 +347,8 @@ export default function ContractWorkspace({
         </div>
       )}
 
-      {latestContract?.status === 'signed' && (
-        <div className="erpSuccess">현재 활성 계약 V{latestContract.version_no}이 계약완료 상태입니다.</div>
+      {activeContract?.status === 'signed' && (
+        <div className="erpSuccess">현재 활성 계약 V{activeContract.version_no}이 계약완료 상태입니다.</div>
       )}
     </section>
   )
