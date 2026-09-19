@@ -37,8 +37,9 @@ export default function ReservationCaseControlCenter({
     setLoading(true)
     setError('')
 
-    const [requestResult, itemResult, quoteResult, contractResult, airResult, hotelResult, landResult] =
+    const [caseResult, requestResult, itemResult, quoteResult, contractResult, airResult, hotelResult, landResult] =
       await Promise.all([
+        supabase.from('ops_reservations').select('case_stage,case_status').eq('organization_id', organizationId).eq('id', reservation.id).maybeSingle(),
         supabase.from('ops_reservation_requests').select('*').eq('organization_id', organizationId).eq('reservation_id', reservation.id).order('created_at', { ascending: false }),
         supabase.from('ops_reservation_request_items').select('*').eq('organization_id', organizationId).eq('reservation_id', reservation.id).order('sort_order'),
         supabase.from('ops_quotes').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reservation_id', reservation.id),
@@ -48,7 +49,7 @@ export default function ReservationCaseControlCenter({
         supabase.from('ops_land_bookings').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('reservation_id', reservation.id),
       ])
 
-    const firstError = [requestResult, itemResult, quoteResult, contractResult, airResult, hotelResult, landResult].find(result => result.error)?.error
+    const firstError = [caseResult, requestResult, itemResult, quoteResult, contractResult, airResult, hotelResult, landResult].find(result => result.error)?.error
     if (firstError) setError(firstError.message)
 
     setRequests(requestResult.data || [])
@@ -60,7 +61,7 @@ export default function ReservationCaseControlCenter({
       hotel: hotelResult.count || 0,
       land: landResult.count || 0,
     })
-    setCurrentStage(normalizeCaseStage(reservation.case_stage))
+    setCurrentStage(normalizeCaseStage(caseResult.data?.case_stage || reservation.case_stage || 'reservation'))
     setLoading(false)
   }
 
@@ -271,10 +272,10 @@ export default function ReservationCaseControlCenter({
               <div className="erpRequestRow" key={item.id}>
                 <b>{({ air: '항공', hotel: '호텔', land: '랜드', tour: '투어', transport: '교통' })[item.service_type] || item.service_type}</b>
                 {canEdit
-                  ? <input value={item.supplier_name || ''} onChange={e => updateItem(item, { supplier_name: e.target.value })} placeholder="거래처" />
+                  ? <input defaultValue={item.supplier_name || ''} onBlur={e => updateItem(item, { supplier_name: e.target.value })} placeholder="거래처" />
                   : <span>{item.supplier_name || '-'}</span>}
                 {canEdit
-                  ? <input value={item.request_detail || ''} onChange={e => updateItem(item, { request_detail: e.target.value })} />
+                  ? <input defaultValue={item.request_detail || ''} onBlur={e => updateItem(item, { request_detail: e.target.value })} />
                   : <span>{item.request_detail || '-'}</span>}
                 {canEdit
                   ? <select value={item.status} onChange={e => updateItem(item, { status: e.target.value })}>
@@ -282,7 +283,7 @@ export default function ReservationCaseControlCenter({
                     </select>
                   : <span>{ITEM_STATUS[item.status] || item.status}</span>}
                 {canEdit
-                  ? <input value={item.confirmation_no || ''} onChange={e => updateItem(item, { confirmation_no: e.target.value })} placeholder="확정번호" />
+                  ? <input defaultValue={item.confirmation_no || ''} onBlur={e => updateItem(item, { confirmation_no: e.target.value })} placeholder="확정번호" />
                   : <span>{item.confirmation_no || '-'}</span>}
               </div>
             ))}
