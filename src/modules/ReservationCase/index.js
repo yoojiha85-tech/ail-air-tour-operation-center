@@ -28,3 +28,5 @@ export const CASE_STAGE_LABEL = {
 
 export const normalizeCaseStage = value =>
   CASE_STAGE_ORDER.includes(value) ? value : 'consultation'
+
+export { default as ReservationCaseControlCenter } from './ReservationCaseControlCenter.jsx'
