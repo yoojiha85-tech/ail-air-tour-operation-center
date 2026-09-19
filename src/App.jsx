@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './lib/supabase'
 import { ConsultationModal } from './modules/Consultation'
+import { QuoteWorkspace } from './modules/Quote'
+import { ContractWorkspace } from './modules/Contract'
+import { ReservationCaseControlCenter } from './modules/ReservationCase'
+import { FinanceSummary } from './modules/Finance'
+import './modules/erp.css'
 import {
   LayoutDashboard, CalendarDays, Plane, Users, ShieldCheck, LogOut,
   Plus, RefreshCw, Save, X, ChevronLeft, ChevronRight
@@ -593,8 +598,16 @@ export default function App(){
     if(x.due_date){const d=dayDiff(new Date(),x.due_date);return d>=0?`D-${d}`:ymd(x.due_date)}
     return '확인필요'
   }
-  const DETAIL_TABS=[['overview','개요'],['travelers','고객·여행자'],['payments','입금·환불'],['expenses','지출·송금'],['checklist','출발 체크'],['settlement','정산·손익'],['history','메모·변경이력']]
+  const DETAIL_TABS=[['overview','개요'],['quote','견적'],['contract','계약'],['case','CASE'],['finance','ERP 손익'],['travelers','고객·여행자'],['payments','입금·환불'],['expenses','지출·송금'],['checklist','출발 체크'],['settlement','정산·손익'],['history','메모·변경이력']]
   function openDetail(r,tab='overview'){if(!r)return;setDetailReservation(r);setDetailTab(tab)}
+  async function refreshDetailReservation(){
+    const currentId=detailReservation?.id
+    await loadAll()
+    if(!currentId)return
+    const {data,error}=await supabase.from('ops_reservations').select('*').eq('organization_id',ORG).eq('id',currentId).maybeSingle()
+    if(error){console.error('CASE refresh failed',error);return}
+    if(data)setDetailReservation(prev=>prev&&prev.id===currentId?{...prev,...data}:prev)
+  }
   function reservationItems(list,id){return list.filter(x=>x.reservation_id===id)}
   function paymentNet(id){return reservationItems(payments,id).reduce((a,p)=>a+(p.payment_type==='refund'?-num(p.amount):num(p.amount)),0)}
   function expensePaidTotal(id){return reservationItems(expenses,id).filter(x=>x.status==='paid'||x.paid_date).reduce((a,x)=>a+num(x.amount_krw),0)}
@@ -1507,6 +1520,10 @@ async function goToTodayWork(x){
       <div className="detailHero"><div><small>{detailReservation.reservation_code} · {TYPE[detailReservation.product_type]||detailReservation.product_type}</small><h2>{detailReservation.customer_name} · {detailReservation.title||detailReservation.destination}</h2><p>{detailReservation.destination||'-'} · 출발 {ymd(detailReservation.departure_date)} · {detailReservation.traveler_count||0}명 · 담당 {detailReservation.manager_name||'미지정'}</p></div><div className="detailHeroActions">{has(member,'reservation_edit')&&<button className="secondary" onClick={()=>{setDetailReservation(null);openEdit(detailReservation)}}>예약 수정</button>}<span className={`statusPill ${detailReservation.status||'confirmed'}`}>{detailReservation.status||'confirmed'}</span></div></div>
       <div className="detailTabs">{DETAIL_TABS.map(([id,label])=><button key={id} className={detailTab===id?'active':''} onClick={()=>setDetailTab(id)}>{label}</button>)}</div>
       <div className="detailBody">
+        {detailTab==='quote'&&<QuoteWorkspace reservation={detailReservation} organizationId={ORG} userId={session.user.id} canEdit={has(member,'reservation_edit')} onChanged={refreshDetailReservation}/>} 
+        {detailTab==='contract'&&<ContractWorkspace reservation={detailReservation} organizationId={ORG} userId={session.user.id} canEdit={has(member,'reservation_edit')} onChanged={refreshDetailReservation}/>} 
+        {detailTab==='case'&&<ReservationCaseControlCenter reservation={detailReservation} organizationId={ORG} userId={session.user.id} canEdit={has(member,'reservation_edit')} onChanged={refreshDetailReservation}/>} 
+        {detailTab==='finance'&&<FinanceSummary reservation={detailReservation} payments={payments} expenses={expenses} canView={has(member,'settlement_view')}/>} 
         {detailTab==='overview'&&<div className="detailGrid">
           <section className="detailCard span2"><h3>예약 핵심정보</h3><div className="infoGrid"><div><span>고객</span><b>{detailReservation.customer_name}</b></div><div><span>연락처</span><b>{detailReservation.customer_phone||'-'}</b></div><div><span>상품</span><b>{detailReservation.title||'-'}</b></div><div><span>지역</span><b>{detailReservation.destination||'-'}</b></div><div><span>출발</span><b>{ymd(detailReservation.departure_date)}</b></div><div><span>귀국</span><b>{ymd(detailReservation.return_date)}</b></div><div><span>랜드사</span><b>{detailReservation.partner_name||'-'}</b></div><div><span>담당자</span><b>{detailReservation.manager_name||'-'}</b></div></div></section>
           <section className="detailCard"><div className="detailSectionHead"><h3>항공 예약</h3>{has(member,'reservation_edit')&&<button className="secondary mini" onClick={()=>openEntityModal('air')}>+ 항공</button>}</div>{reservationItems(airBookings,detailReservation.id).length===0?<div className="emptyMini">등록된 항공 예약 없음</div>:reservationItems(airBookings,detailReservation.id).map(a=><div className="miniRecord" key={a.id}><div className="recordLine"><b>{a.airline||'-'} {a.flight_no||''}</b>{has(member,'reservation_edit')&&<span className="recordActions"><button onClick={()=>openEntityModal('air',a)}>수정</button><button className="dangerText" onClick={()=>deleteOperationalEntity('air',a)}>삭제</button></span>}</div><span>{({international:'국제선',domestic:'국내선',intermediate:'중간항공'})[a.segment_role||a.segment_type]||'국제선'} · {a.departure_airport||'-'} → {a.arrival_airport||'-'}</span><small>{a.departure_at?new Date(a.departure_at).toLocaleString('ko-KR'):'일정 미등록'} · PNR {a.pnr||'-'} · {a.ticketed?'발권완료':'미발권'}</small></div>)}</section>
