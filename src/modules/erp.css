@@ -67,3 +67,16 @@
 .erpFinanceAlerts{display:flex;gap:10px;flex-wrap:wrap}.erpFinanceAlerts>div{background:#fff5e7;border:1px solid #ecd3a5;color:#79541a;border-radius:12px;padding:10px 12px;font-size:12px;font-weight:700}
 @media(max-width:1100px){.erpStageBar{grid-template-columns:repeat(11,100px)}.erpFinanceHero{grid-template-columns:repeat(3,minmax(0,1fr))}.erpFormGrid.four{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.erpWorkspaceHead,.erpEditorFoot{flex-direction:column;align-items:stretch}.erpQuoteGrid,.erpContractList,.erpFinanceGrid,.erpFormGrid,.erpFormGrid.four,.erpCaseMetrics,.erpFinanceHero{grid-template-columns:1fr}.erpItemHeader{display:none}.erpItemRow{grid-template-columns:1fr 1fr}.erpRequestRow{grid-template-columns:1fr}.erpRequestRow.header{display:none}.erpSelectedQuote{align-items:flex-start;flex-direction:column}}
+
+.erpContractCard.superseded{background:#fbfbfc;border-style:dashed;opacity:.92}
+.erpReconcile{display:flex;flex-direction:column;gap:10px;border:1px solid #e0e6ef;border-radius:16px;background:#fbfcfe;padding:14px}
+.erpReconcileCount{font-size:11px;font-weight:800;border-radius:999px;padding:7px 10px;background:#eef2f7;color:#647084}
+.erpReconcileCount.open{background:#fff2e6;color:#9a5a16}
+.erpReconcileTable{display:flex;flex-direction:column;gap:6px}
+.erpReconcileRow{display:grid;grid-template-columns:70px 160px minmax(160px,1fr) minmax(160px,1fr) 150px;gap:8px;align-items:center;border:1px solid #e4e8ee;border-radius:10px;background:#fff;padding:8px 9px;font-size:12px}
+.erpReconcileRow.header{border:0;background:transparent;color:#7a8798;font-size:11px;font-weight:800;padding-top:0}
+.erpReconcileRow>div{display:flex;flex-direction:column;gap:2px}.erpReconcileRow small{color:#8b96a6}
+.erpReconcileRow select{width:100%;border:1px solid #cfd8e5;border-radius:9px;background:#fff;padding:8px;font:inherit}
+.erpSeverity{display:inline-flex;justify-content:center;border-radius:999px;padding:5px 8px;font-size:10px}
+.erpSeverity.high{background:#fff0f0;color:#a53232}.erpSeverity.medium{background:#fff7e7;color:#8a5d18}.erpSeverity.low{background:#edf4ff;color:#315f9c}
+@media(max-width:760px){.erpReconcileRow{grid-template-columns:1fr}.erpReconcileRow.header{display:none}}
