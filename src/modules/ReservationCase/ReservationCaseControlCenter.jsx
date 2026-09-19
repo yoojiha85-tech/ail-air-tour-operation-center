@@ -190,6 +190,48 @@ export default function ReservationCaseControlCenter({
     await load()
   }
 
+  async function addRequestItem() {
+    if (!canEdit || !activeRequest) return
+    const result = await supabase
+      .from('ops_reservation_request_items')
+      .insert({
+        organization_id: organizationId,
+        request_id: activeRequest.id,
+        reservation_id: reservation.id,
+        service_type: 'other',
+        request_detail: '추가 예약 요청',
+        status: 'requested',
+        currency: 'KRW',
+        foreign_amount: 0,
+        cost_amount: 0,
+        sort_order: activeItems.length + 1,
+      })
+
+    if (result.error) {
+      setError(result.error.message)
+      return
+    }
+
+    await load()
+  }
+
+  async function deleteRequestItem(item) {
+    if (!canEdit) return
+    if (!window.confirm('이 예약의뢰 항목을 삭제하시겠습니까?')) return
+    const result = await supabase
+      .from('ops_reservation_request_items')
+      .delete()
+      .eq('organization_id', organizationId)
+      .eq('id', item.id)
+
+    if (result.error) {
+      setError(result.error.message)
+      return
+    }
+
+    await load()
+  }
+
   if (loading) return <div className="erpEmpty">CASE 정보를 불러오는 중...</div>
 
   const stageIndex = CASE_STAGE_ORDER.indexOf(currentStage)
@@ -240,6 +282,11 @@ export default function ReservationCaseControlCenter({
             + 예약의뢰 생성
           </button>
         )}
+        {canEdit && activeRequest && (
+          <button type="button" className="secondary mini" disabled={saving} onClick={addRequestItem}>
+            + 의뢰항목 추가
+          </button>
+        )}
       </div>
 
       {!activeRequest && (
@@ -266,7 +313,7 @@ export default function ReservationCaseControlCenter({
 
           <div className="erpRequestTable">
             <div className="erpRequestRow header">
-              <span>구분</span><span>거래처</span><span>요청내용</span><span>상태</span><span>확정번호</span>
+              <span>구분</span><span>거래처</span><span>요청내용</span><span>상태</span><span>확정번호</span><span>관리</span>
             </div>
             {activeItems.map(item => (
               <div className="erpRequestRow" key={item.id}>
@@ -285,6 +332,9 @@ export default function ReservationCaseControlCenter({
                 {canEdit
                   ? <input defaultValue={item.confirmation_no || ''} onBlur={e => updateItem(item, { confirmation_no: e.target.value })} placeholder="확정번호" />
                   : <span>{item.confirmation_no || '-'}</span>}
+                {canEdit
+                  ? <button type="button" className="dangerText" onClick={() => deleteRequestItem(item)}>삭제</button>
+                  : <span>-</span>}
               </div>
             ))}
           </div>
