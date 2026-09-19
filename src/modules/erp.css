@@ -80,3 +80,26 @@
 .erpSeverity{display:inline-flex;justify-content:center;border-radius:999px;padding:5px 8px;font-size:10px}
 .erpSeverity.high{background:#fff0f0;color:#a53232}.erpSeverity.medium{background:#fff7e7;color:#8a5d18}.erpSeverity.low{background:#edf4ff;color:#315f9c}
 @media(max-width:760px){.erpReconcileRow{grid-template-columns:1fr}.erpReconcileRow.header{display:none}}
+
+.erpCaseDashboard{display:flex;flex-direction:column;gap:14px}
+.erpCaseDashboardStats{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+.erpCaseDashboardStats>div{display:flex;flex-direction:column;gap:4px;border:1px solid #dfe6ef;border-radius:14px;background:#fff;padding:12px}
+.erpCaseDashboardStats span{font-size:11px;color:#758197}.erpCaseDashboardStats b{font-size:18px;color:#18263b}
+.erpCaseDashboardStats .danger{background:#fff2f2;border-color:#ecc1c1}.erpCaseDashboardStats .warn{background:#fff8e9;border-color:#ecd59c}.erpCaseDashboardStats .money b{font-size:14px}
+.erpCaseDashboardFilters{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.erpCaseDashboardFilters>div{display:flex;gap:6px;flex-wrap:wrap}
+.erpCaseDashboardFilters button{border:1px solid #d5dee9;background:#fff;color:#617086;border-radius:999px;padding:7px 11px;font-size:11px;font-weight:800}
+.erpCaseDashboardFilters button.active{background:#1e3557;color:#fff;border-color:#1e3557}
+.erpCaseDashboardFilters select{border:1px solid #d5dee9;border-radius:10px;background:#fff;padding:8px 10px;font-size:12px;color:#39475c}
+.erpCaseDashboardList{display:flex;flex-direction:column;gap:10px}
+.erpCaseDashboardRow{display:grid;grid-template-columns:230px minmax(0,1fr) auto;gap:14px;align-items:center;border:1px solid #e0e6ee;border-left-width:4px;border-radius:16px;background:#fff;padding:14px 15px}
+.erpCaseDashboardRow.danger{border-left-color:#c65050}.erpCaseDashboardRow.warning{border-left-color:#d99a32}.erpCaseDashboardRow.ready{border-left-color:#4e9a6f}
+.erpCaseIdentity{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.erpCaseIdentity>div{display:flex;flex-direction:column;gap:3px;min-width:0}.erpCaseIdentity b{font-size:14px;color:#17263c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.erpCaseIdentity small{font-size:11px;color:#7b8798}.erpCaseIdentity>strong{font-size:16px;color:#273b59;white-space:nowrap}
+.erpHealth{display:inline-flex;align-self:flex-start;border-radius:999px;padding:4px 7px;font-size:10px;font-weight:800}.erpHealth.danger{background:#fff0f0;color:#a43636}.erpHealth.warning{background:#fff5df;color:#916117}.erpHealth.ready{background:#eef8f2;color:#2f6e49}
+.erpCaseProgress{display:grid;grid-template-columns:repeat(6,minmax(100px,1fr));gap:8px}
+.erpCaseProgress>div{display:flex;flex-direction:column;gap:2px;border-left:1px solid #edf0f4;padding-left:9px;min-width:0}.erpCaseProgress span{font-size:10px;color:#8792a3}.erpCaseProgress b{font-size:12px;color:#23324a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.erpCaseProgress small{font-size:10px;color:#7a8697}
+.erpCaseWarnings{display:flex;gap:5px;flex-wrap:wrap}.erpCaseWarnings span{background:#fff5e7;border:1px solid #edd3a2;color:#81571c;border-radius:999px;padding:5px 7px;font-size:10px;font-weight:800}
+.erpCaseDashboardActions{display:flex;gap:6px;justify-content:flex-end}
+@media(max-width:1250px){.erpCaseDashboardStats{grid-template-columns:repeat(4,minmax(0,1fr))}.erpCaseDashboardRow{grid-template-columns:200px minmax(0,1fr)}.erpCaseDashboardActions{grid-column:1/-1}.erpCaseProgress{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.erpCaseDashboardStats{grid-template-columns:repeat(2,minmax(0,1fr))}.erpCaseDashboardRow{grid-template-columns:1fr}.erpCaseProgress{grid-template-columns:repeat(2,minmax(0,1fr))}.erpCaseWarnings,.erpCaseDashboardActions{grid-column:auto}.erpCaseDashboardActions{justify-content:flex-start}}
