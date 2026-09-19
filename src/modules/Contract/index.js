@@ -18,3 +18,5 @@ export const createContractDraft = ({ reservationId = null, quoteId = null } = {
   special_terms: '',
   cancellation_terms: '',
 })
+
+export { default as ContractWorkspace } from './ContractWorkspace.jsx'
