@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import ReconciliationPanel from './ReconciliationPanel.jsx'
 const CASE_STAGE_ORDER = [
   'consultation','quote','contract','request','reservation','ticketing',
   'balance','briefing','departure','returned','settled',
@@ -283,6 +284,13 @@ export default function ReservationCaseControlCenter({
         <div><span>호텔</span><b>{counts.hotel}건</b></div>
         <div><span>랜드</span><b>{counts.land}건</b></div>
       </div>
+
+      <ReconciliationPanel
+        reservation={reservation}
+        organizationId={organizationId}
+        userId={userId}
+        canEdit={canEdit}
+      />
 
       <div className="erpWorkspaceHead compact">
         <div>
