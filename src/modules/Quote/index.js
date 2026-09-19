@@ -17,3 +17,5 @@ export const createQuoteDraft = reservationId => ({
   internal_note: '',
   items: [],
 })
+
+export { default as QuoteWorkspace } from './QuoteWorkspace.jsx'
