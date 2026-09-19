@@ -101,5 +101,12 @@
 .erpCaseProgress>div{display:flex;flex-direction:column;gap:2px;border-left:1px solid #edf0f4;padding-left:9px;min-width:0}.erpCaseProgress span{font-size:10px;color:#8792a3}.erpCaseProgress b{font-size:12px;color:#23324a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.erpCaseProgress small{font-size:10px;color:#7a8697}
 .erpCaseWarnings{display:flex;gap:5px;flex-wrap:wrap}.erpCaseWarnings span{background:#fff5e7;border:1px solid #edd3a2;color:#81571c;border-radius:999px;padding:5px 7px;font-size:10px;font-weight:800}
 .erpCaseDashboardActions{display:flex;gap:6px;justify-content:flex-end}
+
+.erpSearchInput{min-width:260px;border:1px solid #d5dee9;border-radius:10px;padding:8px 10px;font:inherit;color:#39475c}
+.erpRequestRow.clickable{cursor:pointer;text-align:left;width:100%;font:inherit}
+.erpRequestRow.clickable.selected{background:#f4f8ff;border-color:#9eb7da}
+.erpConsentLabel{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#465469;margin:4px 0 14px}
+.erpConsentLabel input{width:auto;margin:0}
+@media(max-width:760px){.erpSearchInput{min-width:0;width:100%}}
 @media(max-width:1250px){.erpCaseDashboardStats{grid-template-columns:repeat(4,minmax(0,1fr))}.erpCaseDashboardRow{grid-template-columns:200px minmax(0,1fr)}.erpCaseDashboardActions{grid-column:1/-1}.erpCaseProgress{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.erpCaseDashboardStats{grid-template-columns:repeat(2,minmax(0,1fr))}.erpCaseDashboardRow{grid-template-columns:1fr}.erpCaseProgress{grid-template-columns:repeat(2,minmax(0,1fr))}.erpCaseWarnings,.erpCaseDashboardActions{grid-column:auto}.erpCaseDashboardActions{justify-content:flex-start}}

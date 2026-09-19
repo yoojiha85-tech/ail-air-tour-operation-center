@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from './lib/supabase'
-import { ConsultationModal } from './modules/Consultation'
+import { ConsultationModal, ConsultationWorkspace } from './modules/Consultation'
 import { QuoteWorkspace } from './modules/Quote'
 import { ContractWorkspace } from './modules/Contract'
 import { ReservationCaseControlCenter, CaseDashboard } from './modules/ReservationCase'
@@ -27,6 +27,7 @@ const defaultPerms = Object.fromEntries(Object.keys(PERM).map(k=>[k,false]))
 
 const NAV = [
   ['dashboard','▦ 통합 대시보드','dashboard_view'],
+  ['consultations','☎ 상담기록','dashboard_view'],
   ['calendar','▣ 출발 캘린더','calendar_view'],
   ['honeymoon','허니문','reservation_view'],
   ['package','해외패키지','reservation_view'],
@@ -755,6 +756,23 @@ async function goToTodayWork(x){
     if(created)openDetail(created,'overview')
   }
 
+  async function handleConsultationConverted(result){
+    if(!result?.reservation_id)return
+
+    await syncReservationToGoogleSheets('create',result.reservation_id)
+
+    const {data:created}=await supabase
+      .from('ops_reservations')
+      .select('*')
+      .eq('organization_id',ORG)
+      .eq('id',result.reservation_id)
+      .maybeSingle()
+
+    await loadAll()
+    alert(`예약 전환이 완료되었습니다.\n예약번호: ${result.reservation_code||''}`)
+    if(created)openDetail(created,'overview')
+  }
+
   async function quickReservationUpdate(reservationId,patch,successMessage){
     if(!has(member,'reservation_edit'))return alert('예약 수정 권한이 없습니다.')
     const {error}=await supabase.from('ops_reservations').update(patch).eq('organization_id',ORG).eq('id',reservationId)
@@ -1299,7 +1317,7 @@ async function goToTodayWork(x){
 
   const nav=NAV.filter(n=>has(member,n[2]))
   const safeYear = Number.isFinite(Number(year)) ? Number(year) : 2026
-  const activeTitle = page==='dashboard'?'통합 예약 현황':page==='calendar'?'출발 캘린더':page==='airvi'?`${safeYear}년 항공 발권 VI`:page==='staff'?'직원·권한 관리':TYPE[page]
+  const activeTitle = page==='dashboard'?'통합 예약 현황':page==='consultations'?'상담기록 관리':page==='calendar'?'출발 캘린더':page==='airvi'?`${safeYear}년 항공 발권 VI`:page==='staff'?'직원·권한 관리':TYPE[page]
 
   return <div className="shell">
     <aside className="side">
@@ -1310,7 +1328,7 @@ async function goToTodayWork(x){
     <main>
       <header className="top">
         <div><small>RESERVATION CONTROL</small><h1>{activeTitle}</h1>
-        <p>{page==='calendar'?'예약 출발일과 진행상태가 자동으로 연동됩니다.':'예약부터 입금·지출·최종 정산까지 한곳에서 관리합니다.'}</p></div>
+        <p>{page==='calendar'?'예약 출발일과 진행상태가 자동으로 연동됩니다.':page==='consultations'?'온라인 문의와 전화·방문 상담을 함께 기록하고 예약으로 전환합니다.':'예약부터 입금·지출·최종 정산까지 한곳에서 관리합니다.'}</p></div>
         {(page==='honeymoon'||page==='package'||page==='air'||page==='group')&&has(member,'reservation_create')&&
           <button className="primary" onClick={()=>openCreate(page)}><Plus size={18}/> 새 예약 등록</button>}
       </header>
@@ -1452,6 +1470,14 @@ async function goToTodayWork(x){
           </div>})}</div>
         </section>}
       </>}
+
+      {page==='consultations'&&<ConsultationWorkspace
+        organizationId={ORG}
+        userId={session.user.id}
+        canEdit={has(member,'reservation_edit')}
+        canCreate={has(member,'reservation_create')}
+        onConverted={handleConsultationConverted}
+      />}
 
       {page==='calendar'&&<Calendar rows={rows} date={calendarDate} setDate={setCalendarDate}/>}
 
