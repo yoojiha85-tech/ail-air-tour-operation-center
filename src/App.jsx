@@ -604,9 +604,14 @@ export default function App(){
     const currentId=detailReservation?.id
     await loadAll()
     if(!currentId)return
-    const {data,error}=await supabase.from('ops_reservations').select('*').eq('organization_id',ORG).eq('id',currentId).maybeSingle()
+    const [baseResult,viewResult]=await Promise.all([
+      supabase.from('ops_reservations').select('*').eq('organization_id',ORG).eq('id',currentId).maybeSingle(),
+      supabase.from('ops_dashboard_reservations').select('*').eq('organization_id',ORG).eq('id',currentId).maybeSingle()
+    ])
+    const error=baseResult.error||viewResult.error
     if(error){console.error('CASE refresh failed',error);return}
-    if(data)setDetailReservation(prev=>prev&&prev.id===currentId?{...prev,...data}:prev)
+    const merged={...(viewResult.data||{}),...(baseResult.data||{})}
+    if(merged.id)setDetailReservation(prev=>prev&&prev.id===currentId?{...prev,...merged}:prev)
   }
   function reservationItems(list,id){return list.filter(x=>x.reservation_id===id)}
   function paymentNet(id){return reservationItems(payments,id).reduce((a,p)=>a+(p.payment_type==='refund'?-num(p.amount):num(p.amount)),0)}
