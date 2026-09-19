@@ -2,15 +2,22 @@ const number = value => Number(value || 0)
 
 export function calculateFinanceSummary({
   saleAmount = 0,
+  finalSaleAmount = null,
+  exchangeAdjustmentAmount = 0,
   additionalAmount = 0,
   discountAmount = 0,
   payments = [],
   expenses = [],
 } = {}) {
-  const finalSale =
+  const calculatedSale =
     number(saleAmount) +
+    number(exchangeAdjustmentAmount) +
     number(additionalAmount) -
     number(discountAmount)
+  const finalSale =
+    finalSaleAmount === null || finalSaleAmount === undefined
+      ? calculatedSale
+      : number(finalSaleAmount)
 
   const received = payments.reduce((sum, item) => {
     const amount = number(item.amount)
