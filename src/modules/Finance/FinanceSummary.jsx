@@ -32,6 +32,8 @@ export default function FinanceSummary({
   const summary = useMemo(
     () => calculateFinanceSummary({
       saleAmount: reservation?.sale_amount,
+      finalSaleAmount: reservation?.final_sale_amount,
+      exchangeAdjustmentAmount: reservation?.exchange_adjustment_amount,
       additionalAmount: reservation?.additional_amount,
       discountAmount: 0,
       payments: relatedPayments,
