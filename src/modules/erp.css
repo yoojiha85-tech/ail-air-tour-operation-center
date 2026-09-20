@@ -130,7 +130,21 @@
 
 .erpUrgent{color:#b03030;font-weight:800}
 
-.erpRequestRow.consultRow{grid-template-columns:90px 150px minmax(200px,1fr) 110px 100px 54px}
+.erpRequestRow.consultRow{grid-template-columns:90px 150px 150px minmax(200px,1fr) 110px 100px 54px}
+.erpConsultCode{font-size:11px!important;font-weight:800;color:#315f9c!important;white-space:nowrap}
+.erpConsultQuotePanel{margin:14px 0;border:1px solid #cbd8e8;border-radius:14px;background:#f7faff;padding:13px 14px}
+.erpConsultQuoteHead{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.erpConsultQuoteHead>div:first-child{display:flex;flex-direction:column;gap:3px}
+.erpConsultQuoteHead small{font-size:9px;font-weight:900;letter-spacing:.08em;color:#6680a3}
+.erpConsultQuoteHead b{font-size:14px;color:#1b2a41}.erpConsultQuoteHead span{font-size:11px;color:#708096}
+.erpConsultQuoteHead>div:last-child{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.erpConsultQuoteGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:11px}
+.erpConsultQuoteItem{border:1px solid #dce5ef;border-radius:11px;background:#fff;padding:9px 10px;display:flex;flex-direction:column;gap:2px}
+.erpConsultQuoteItem span,.erpConsultQuoteItem small{font-size:10px;color:#758197}.erpConsultQuoteItem b{font-size:11px;color:#284d7d}.erpConsultQuoteItem strong{font-size:14px;color:#15223a}
+.erpConsultQuoteEmpty{grid-column:1/-1;padding:12px;border:1px dashed #d8e1ec;border-radius:10px;color:#748196;font-size:11px;background:#fff;margin-top:10px}
+.erpConsultTimeline{margin-top:10px;padding-top:9px;border-top:1px dashed #ced9e6;display:flex;flex-direction:column;gap:4px}
+.erpConsultTimeline b{font-size:11px;color:#334b6b}.erpConsultTimeline span{font-size:10px;color:#748196;line-height:1.45}
+@media(max-width:760px){.erpConsultQuoteHead{flex-direction:column}.erpConsultQuoteHead>div:last-child{justify-content:flex-start}.erpConsultQuoteGrid{grid-template-columns:1fr}}
 @media(max-width:760px){.erpRequestRow.consultRow{grid-template-columns:1fr}}
 @media(max-width:1250px){.erpCaseDashboardStats{grid-template-columns:repeat(4,minmax(0,1fr))}.erpCaseDashboardRow{grid-template-columns:200px minmax(0,1fr)}.erpCaseDashboardActions{grid-column:1/-1}.erpCaseProgress{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.erpCaseDashboardStats{grid-template-columns:repeat(2,minmax(0,1fr))}.erpCaseDashboardRow{grid-template-columns:1fr}.erpCaseProgress{grid-template-columns:repeat(2,minmax(0,1fr))}.erpCaseWarnings,.erpCaseDashboardActions{grid-column:auto}.erpCaseDashboardActions{justify-content:flex-start}}
