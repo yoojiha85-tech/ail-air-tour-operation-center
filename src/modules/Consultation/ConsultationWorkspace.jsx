@@ -36,7 +36,28 @@ const STATUS_FILTERS = [
 
 const OPEN_STATUSES = ['new', 'contacting', 'quoted', 'contracted']
 
+const SOURCE_FILTERS = [
+  ['all', '전체 경로'],
+  ['ail-travel-main', '온라인(홈페이지)'],
+  ['offline_phone', '전화상담'],
+  ['offline_walkin', '방문상담'],
+  ['offline_referral', '지인소개'],
+  ['offline_other', '기타(오프라인)'],
+]
+
 const ymd = value => (value ? String(value).slice(0, 10) : '-')
+
+const hoursSince = value => (value ? (Date.now() - new Date(value).getTime()) / 3600000 : null)
+
+const elapsedLabel = value => {
+  const hours = hoursSince(value)
+  if (hours === null) return '-'
+  if (hours < 1) return '방금 접수'
+  if (hours < 24) return `${Math.floor(hours)}시간 경과`
+  return `${Math.floor(hours / 24)}일 경과`
+}
+
+const isOverdueNew = item => item.status === 'new' && (hoursSince(item.created_at) || 0) > 24
 
 const emptyForm = () => ({
   request_type: '',
@@ -63,6 +84,7 @@ export default function ConsultationWorkspace({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [statusFilter, setStatusFilter] = useState('open')
+  const [sourceFilter, setSourceFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [form, setForm] = useState(null)
   const [selected, setSelected] = useState(null)
@@ -88,10 +110,20 @@ export default function ConsultationWorkspace({
     load()
   }, [organizationId])
 
+  const summary = useMemo(() => {
+    const open = items.filter(item => OPEN_STATUSES.includes(item.status))
+    const fresh = items.filter(item => item.status === 'new')
+    const overdue = fresh.filter(isOverdueNew)
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const today = items.filter(item => String(item.created_at || '').slice(0, 10) === todayStr)
+    return { open: open.length, fresh: fresh.length, overdue: overdue.length, today: today.length }
+  }, [items])
+
   const filtered = useMemo(() => {
     let list = [...items]
     if (statusFilter === 'open') list = list.filter(item => OPEN_STATUSES.includes(item.status))
     else if (statusFilter !== 'all') list = list.filter(item => item.status === statusFilter)
+    if (sourceFilter !== 'all') list = list.filter(item => item.source === sourceFilter)
 
     const term = search.trim()
     if (term) {
@@ -103,8 +135,16 @@ export default function ConsultationWorkspace({
         (item.request_code || '').toUpperCase().includes(term.toUpperCase()),
       )
     }
+
+    list.sort((a, b) => {
+      const aUrgent = a.status === 'new'
+      const bUrgent = b.status === 'new'
+      if (aUrgent !== bUrgent) return aUrgent ? -1 : 1
+      if (aUrgent && bUrgent) return new Date(a.created_at) - new Date(b.created_at)
+      return new Date(b.created_at) - new Date(a.created_at)
+    })
     return list
-  }, [items, statusFilter, search])
+  }, [items, statusFilter, sourceFilter, search])
 
   function openCreate() {
     if (!canCreate) return
@@ -272,6 +312,13 @@ export default function ConsultationWorkspace({
 
       {error && <div className="erpError">{error}</div>}
 
+      <div className="erpConsultSummary">
+        <div><span>진행중</span><b>{summary.open}건</b></div>
+        <div><span>신규(미응대)</span><b>{summary.fresh}건</b></div>
+        <div><span>오늘 접수</span><b>{summary.today}건</b></div>
+        <div className={summary.overdue > 0 ? 'warn' : ''}><span>24시간 초과 미응대</span><b>{summary.overdue}건</b></div>
+      </div>
+
       <div className="erpCaseDashboardFilters">
         <div>
           {STATUS_FILTERS.map(([key, label]) => (
@@ -285,30 +332,35 @@ export default function ConsultationWorkspace({
             </button>
           ))}
         </div>
-        <input
-          className="erpSearchInput"
-          placeholder="고객명 · 연락처 · 여행지 · 상담코드 검색"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
+        <div className="erpCaseDashboardFiltersRight">
+          <select value={sourceFilter} onChange={e => setSourceFilter(e.target.value)}>
+            {SOURCE_FILTERS.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+          </select>
+          <input
+            className="erpSearchInput"
+            placeholder="고객명 · 연락처 · 여행지 · 상담코드 검색"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       <div className="erpRequestTable">
-        <div className="erpRequestRow header">
-          <span>상태</span><span>고객</span><span>여행지 · 희망일</span><span>접수경로</span><span>접수일</span><span>예약전환</span>
+        <div className="erpRequestRow header consultRow">
+          <span>상태</span><span>고객</span><span>여행지 · 희망일</span><span>접수경로</span><span>경과</span><span>예약전환</span>
         </div>
         {filtered.map(item => (
           <button
             type="button"
             key={item.id}
-            className={`erpRequestRow clickable ${selected?.id === item.id ? 'selected' : ''}`}
+            className={`erpRequestRow clickable consultRow ${selected?.id === item.id ? 'selected' : ''}`}
             onClick={() => openSelected(item)}
           >
-            <b>{STATUS_LABEL[item.status] || item.status}</b>
+            <span className={`erpStatusBadge status-${item.status}`}>{STATUS_LABEL[item.status] || item.status}</span>
             <span>{item.customer_name} · {item.phone}</span>
             <span>{item.destination} · {ymd(item.departure_date)}</span>
             <span>{SOURCE_LABEL[item.source] || item.source}</span>
-            <span>{ymd(item.created_at)}</span>
+            <span className={isOverdueNew(item) ? 'erpUrgent' : ''}>{elapsedLabel(item.created_at)}</span>
             <span>{item.reservation_id ? '완료' : '-'}</span>
           </button>
         ))}

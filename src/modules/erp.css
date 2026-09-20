@@ -108,5 +108,29 @@
 .erpConsentLabel{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:#465469;margin:4px 0 14px}
 .erpConsentLabel input{width:auto;margin:0}
 @media(max-width:760px){.erpSearchInput{min-width:0;width:100%}}
+
+.erpConsultSummary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+.erpConsultSummary>div{border:1px solid #d9e2ed;border-radius:12px;background:#fff;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.erpConsultSummary span{font-size:11px;color:#758197;font-weight:700}
+.erpConsultSummary b{font-size:19px;color:#15223a}
+.erpConsultSummary>div.warn{background:#fff5f5;border-color:#f0b7b7}
+.erpConsultSummary>div.warn b{color:#b03030}
+@media(max-width:760px){.erpConsultSummary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+.erpCaseDashboardFiltersRight{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+.erpStatusBadge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:800;white-space:nowrap}
+.erpStatusBadge.status-new{background:#fde8e8;color:#b03030}
+.erpStatusBadge.status-contacting{background:#fef1dd;color:#a1650a}
+.erpStatusBadge.status-quoted{background:#f1e9fb;color:#6633a3}
+.erpStatusBadge.status-contracted{background:#e4f3e8;color:#237a45}
+.erpStatusBadge.status-converted{background:#1e3557;color:#fff}
+.erpStatusBadge.status-hold{background:#eef1f5;color:#5c6b81}
+.erpStatusBadge.status-closed{background:#f4f5f7;color:#9aa5b4}
+
+.erpUrgent{color:#b03030;font-weight:800}
+
+.erpRequestRow.consultRow{grid-template-columns:90px 150px minmax(200px,1fr) 110px 100px 54px}
+@media(max-width:760px){.erpRequestRow.consultRow{grid-template-columns:1fr}}
 @media(max-width:1250px){.erpCaseDashboardStats{grid-template-columns:repeat(4,minmax(0,1fr))}.erpCaseDashboardRow{grid-template-columns:200px minmax(0,1fr)}.erpCaseDashboardActions{grid-column:1/-1}.erpCaseProgress{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.erpCaseDashboardStats{grid-template-columns:repeat(2,minmax(0,1fr))}.erpCaseDashboardRow{grid-template-columns:1fr}.erpCaseProgress{grid-template-columns:repeat(2,minmax(0,1fr))}.erpCaseWarnings,.erpCaseDashboardActions{grid-column:auto}.erpCaseDashboardActions{justify-content:flex-start}}
