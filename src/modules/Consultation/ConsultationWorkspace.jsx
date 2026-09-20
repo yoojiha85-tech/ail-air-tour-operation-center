@@ -35,6 +35,8 @@ const STATUS_FILTERS = [
 ]
 
 const OPEN_STATUSES = ['new', 'contacting', 'quoted', 'contracted']
+const CANCUN_QUOTE_URL = 'https://ail-travel-main.netlify.app/admin/cancun-quote/'
+const isCancun = value => /칸쿤|cancun/i.test(String(value || ''))
 
 const SOURCE_FILTERS = [
   ['all', '전체 경로'],
@@ -90,6 +92,8 @@ export default function ConsultationWorkspace({
   const [selected, setSelected] = useState(null)
   const [memoDraft, setMemoDraft] = useState('')
   const [saving, setSaving] = useState(false)
+  const [cancunContext, setCancunContext] = useState(null)
+  const [cancunLoading, setCancunLoading] = useState(false)
 
   async function load() {
     if (!organizationId) return
@@ -205,6 +209,30 @@ export default function ConsultationWorkspace({
     setSelected(item)
     setMemoDraft(item.internal_memo || '')
     setError('')
+    setCancunContext(null)
+    if (isCancun(item.destination)) loadCancunContext(item)
+  }
+
+  async function loadCancunContext(item = selected) {
+    if (!item?.request_code || !isCancun(item.destination)) return
+    setCancunLoading(true)
+    const result = await supabase.rpc('cancun_get_consultation_context', {
+      p_request_code: item.request_code,
+    })
+    if (result.error) {
+      setError(result.error.message)
+      setCancunContext(null)
+    } else {
+      setCancunContext(result.data || null)
+    }
+    setCancunLoading(false)
+  }
+
+  function openCancunQuote() {
+    if (!selected?.request_code) return
+    const url = new URL(CANCUN_QUOTE_URL)
+    url.searchParams.set('consultation', selected.request_code)
+    window.open(url.toString(), '_blank', 'noopener,noreferrer')
   }
 
   async function patchSelected(patch) {
@@ -347,7 +375,7 @@ export default function ConsultationWorkspace({
 
       <div className="erpRequestTable">
         <div className="erpRequestRow header consultRow">
-          <span>상태</span><span>고객</span><span>여행지 · 희망일</span><span>접수경로</span><span>경과</span><span>예약전환</span>
+          <span>상태</span><span>상담번호</span><span>고객</span><span>여행지 · 희망일</span><span>접수경로</span><span>경과</span><span>예약전환</span>
         </div>
         {filtered.map(item => (
           <button
@@ -357,6 +385,7 @@ export default function ConsultationWorkspace({
             onClick={() => openSelected(item)}
           >
             <span className={`erpStatusBadge status-${item.status}`}>{STATUS_LABEL[item.status] || item.status}</span>
+            <span className="erpConsultCode">{item.request_code}</span>
             <span>{item.customer_name} · {item.phone}</span>
             <span>{item.destination} · {ymd(item.departure_date)}</span>
             <span>{SOURCE_LABEL[item.source] || item.source}</span>
@@ -456,6 +485,7 @@ export default function ConsultationWorkspace({
           </div>
 
           <div className="erpMiniList">
+            <div><span>상담번호</span><b>{selected.request_code}</b></div>
             <div><span>연락처</span><b>{selected.phone}</b></div>
             <div><span>희망여행지</span><b>{selected.destination}</b></div>
             <div><span>출발예정일</span><b>{ymd(selected.departure_date)}</b></div>
@@ -467,6 +497,59 @@ export default function ConsultationWorkspace({
 
           {selected.reservation_id && (
             <div className="erpSuccess">이미 예약으로 전환된 상담입니다.</div>
+          )}
+
+          {isCancun(selected.destination) && (
+            <div className="erpConsultQuotePanel">
+              <div className="erpConsultQuoteHead">
+                <div>
+                  <small>CANCUN QUOTE LINK</small>
+                  <b>칸쿤 견적 · 상담번호 연결</b>
+                  <span>{selected.request_code} 한 건에 A–E 견적과 수정 버전을 계속 누적합니다.</span>
+                </div>
+                <div>
+                  <button type="button" className="secondary mini" disabled={cancunLoading} onClick={() => loadCancunContext(selected)}>
+                    {cancunLoading ? '조회 중...' : '이력 새로고침'}
+                  </button>
+                  {(canEdit || canCreate) && (
+                    <button type="button" className="primary mini" onClick={openCancunQuote}>
+                      칸쿤 요금 견적 작성
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {cancunLoading && <div className="erpConsultQuoteEmpty">연결된 칸쿤 견적을 확인하는 중...</div>}
+
+              {!cancunLoading && cancunContext && (
+                <>
+                  <div className="erpConsultQuoteGrid">
+                    {(cancunContext.quotes || []).map(q => (
+                      <div key={q.id} className="erpConsultQuoteItem">
+                        <span>{q.slotCode || '-'}안 · v{q.latestVersion || 0}</span>
+                        <b>{q.quoteNo}</b>
+                        <strong>{q.finalPricePpKrw ? Number(q.finalPricePpKrw).toLocaleString('ko-KR') + '원/인' : '판매가 미확정'}</strong>
+                        <small>{q.updatedAt ? new Date(q.updatedAt).toLocaleString('ko-KR') : '-'}</small>
+                      </div>
+                    ))}
+                    {!(cancunContext.quotes || []).length && (
+                      <div className="erpConsultQuoteEmpty">이 상담번호로 저장된 칸쿤 견적이 없습니다.</div>
+                    )}
+                  </div>
+                  {!!(cancunContext.events || []).length && (
+                    <div className="erpConsultTimeline">
+                      <b>상담 · 견적 기록</b>
+                      {(cancunContext.events || []).slice(0, 10).map(event => (
+                        <span key={event.id}>
+                          {event.createdAt ? new Date(event.createdAt).toLocaleString('ko-KR') : '-'} · {event.title}
+                          {event.detail ? ` · ${event.detail}` : ''}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           )}
 
           <div className="erpFormGrid">
@@ -501,6 +584,11 @@ export default function ConsultationWorkspace({
             {canEdit && selected.status === 'new' && (
               <button type="button" className="secondary mini" disabled={saving} onClick={startContact}>
                 상담 시작
+              </button>
+            )}
+            {isCancun(selected.destination) && (canEdit || canCreate) && (
+              <button type="button" className="primary mini" onClick={openCancunQuote}>
+                칸쿤 견적 열기
               </button>
             )}
             {canCreate && canEdit && !selected.reservation_id && (
