@@ -941,6 +941,15 @@ body{background:var(--ail-bg)}
     white-space:nowrap;
   }
 
+  /* 예약번호·고객 칸은 값이 길면(단체명, "OOO 외 N인" 등) 줄바꿈 없이 옆 칸으로
+     흘러넘쳐 텍스트가 겹쳐 보였던 문제 수정 — 말줄임(...) 처리로 겹침 방지.
+     전체 값은 title 툴팁으로 확인 가능. */
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(1),
+  .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(2){
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+
   /* Product/region is the only column allowed to wrap; cap at two lines. */
   .tableWrap > table:has(thead th:nth-child(12)) td:nth-child(3){
     white-space:normal;
