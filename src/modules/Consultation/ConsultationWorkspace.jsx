@@ -36,7 +36,9 @@ const STATUS_FILTERS = [
 
 const OPEN_STATUSES = ['new', 'contacting', 'quoted', 'contracted']
 const CANCUN_QUOTE_URL = 'https://ail-travel-main.netlify.app/admin/cancun-quote/'
+const MAURITIUS_QUOTE_URL = 'https://ail-travel-main.netlify.app/admin/mauritius-quote/'
 const isCancun = value => /칸쿤|cancun/i.test(String(value || ''))
+const isMauritius = value => /모리셔스|mauritius/i.test(String(value || ''))
 
 const SOURCE_FILTERS = [
   ['all', '전체 경로'],
@@ -231,6 +233,13 @@ export default function ConsultationWorkspace({
   function openCancunQuote() {
     if (!selected?.request_code) return
     const url = new URL(CANCUN_QUOTE_URL)
+    url.searchParams.set('consultation', selected.request_code)
+    window.open(url.toString(), '_blank', 'noopener,noreferrer')
+  }
+
+  function openMauritiusQuote() {
+    if (!selected?.request_code) return
+    const url = new URL(MAURITIUS_QUOTE_URL)
     url.searchParams.set('consultation', selected.request_code)
     window.open(url.toString(), '_blank', 'noopener,noreferrer')
   }
@@ -499,6 +508,28 @@ export default function ConsultationWorkspace({
             <div className="erpSuccess">이미 예약으로 전환된 상담입니다.</div>
           )}
 
+          {isMauritius(selected.destination) && (
+            <div className="erpConsultQuotePanel">
+              <div className="erpConsultQuoteHead">
+                <div>
+                  <small>MAURITIUS QUOTE LINK</small>
+                  <b>모리셔스 견적 · 운영센터 상담번호 연결</b>
+                  <span>{selected.request_code} 한 건에 모리셔스 견적 1~5안과 수정 버전을 동일 상담 건으로 관리합니다.</span>
+                </div>
+                <div>
+                  {(canEdit || canCreate) && (
+                    <button type="button" className="primary mini" onClick={openMauritiusQuote}>
+                      모리셔스 견적 1~5안 관리
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="erpConsultQuoteEmpty">
+                운영센터 상담번호를 그대로 전달합니다. 기존 견적이 없어도 같은 상담번호로 첫 견적을 생성할 수 있습니다.
+              </div>
+            </div>
+          )}
+
           {isCancun(selected.destination) && (
             <div className="erpConsultQuotePanel">
               <div className="erpConsultQuoteHead">
@@ -584,6 +615,11 @@ export default function ConsultationWorkspace({
             {canEdit && selected.status === 'new' && (
               <button type="button" className="secondary mini" disabled={saving} onClick={startContact}>
                 상담 시작
+              </button>
+            )}
+            {isMauritius(selected.destination) && (canEdit || canCreate) && (
+              <button type="button" className="primary mini" onClick={openMauritiusQuote}>
+                모리셔스 견적 열기
               </button>
             )}
             {isCancun(selected.destination) && (canEdit || canCreate) && (
