@@ -1,0 +1,44 @@
+name: One-time configurable quote origin patch 20260929
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-time-quote-origin-config-20260929.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Patch quote app origin
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('src/modules/Consultation/ConsultationWorkspace.jsx')
+          s=p.read_text(encoding='utf-8')
+          old="const CANCUN_QUOTE_URL = 'https://ail-travel-main.netlify.app/admin/cancun-quote/'\nconst MAURITIUS_QUOTE_URL = 'https://ail-travel-main.netlify.app/admin/mauritius-quote/'"
+          new="const QUOTE_APP_ORIGIN = String(import.meta.env.VITE_QUOTE_APP_ORIGIN || 'https://ail-travel-main.netlify.app').replace(/\\/+$/, '')\nconst CANCUN_QUOTE_URL = `${QUOTE_APP_ORIGIN}/admin/cancun-quote/`\nconst MAURITIUS_QUOTE_URL = `${QUOTE_APP_ORIGIN}/admin/mauritius-quote/`"
+          if old not in s:
+              raise SystemExit('quote URL constants block not found')
+          p.write_text(s.replace(old,new,1),encoding='utf-8')
+          PY
+      - name: Verify build
+        run: |
+          grep -F 'VITE_QUOTE_APP_ORIGIN' src/modules/Consultation/ConsultationWorkspace.jsx
+          npm ci
+          npm run build
+      - name: Commit and remove workflow
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/one-time-quote-origin-config-20260929.yml
+          git add src/modules/Consultation/ConsultationWorkspace.jsx
+          git commit -m "Make quote app origin configurable"
+          git push origin HEAD:main
