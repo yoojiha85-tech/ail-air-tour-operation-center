@@ -32,7 +32,7 @@ jobs:
       - name: Verify build
         run: |
           grep -F 'VITE_QUOTE_APP_ORIGIN' src/modules/Consultation/ConsultationWorkspace.jsx
-          npm ci
+          npm install --no-audit --no-fund
           npm run build
       - name: Commit and remove workflow
         run: |
