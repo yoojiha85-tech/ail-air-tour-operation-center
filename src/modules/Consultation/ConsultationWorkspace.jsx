@@ -35,7 +35,7 @@ const STATUS_FILTERS = [
 ]
 
 const OPEN_STATUSES = ['new', 'contacting', 'quoted', 'contracted']
-const QUOTE_APP_ORIGIN = String(import.meta.env.VITE_QUOTE_APP_ORIGIN || 'https://ail-travel-main.netlify.app').replace(/\/+$/, '')
+const QUOTE_APP_ORIGIN = String(import.meta.env.VITE_QUOTE_APP_ORIGIN || 'https://ail-travel-main.vercel.app').replace(/\/+$/, '')
 const CANCUN_QUOTE_URL = `${QUOTE_APP_ORIGIN}/admin/cancun-quote/`
 const MAURITIUS_QUOTE_URL = `${QUOTE_APP_ORIGIN}/admin/mauritius-quote/`
 const isCancun = value => /칸쿤|cancun/i.test(String(value || ''))
