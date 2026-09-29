@@ -1,0 +1,57 @@
+name: One-time finalize Vercel ops 20260929
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/one-time-finalize-vercel-ops-20260929.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Replace remaining old main runtime domain
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          old='https://ail-travel-main.netlify.app'
+          new='https://ail-travel-main.vercel.app'
+          changed=[]
+          skip={'.git','node_modules','dist','.build'}
+          for p in Path('.').rglob('*'):
+              if not p.is_file() or any(part in skip for part in p.parts):
+                  continue
+              try:
+                  s=p.read_text(encoding='utf-8')
+              except Exception:
+                  continue
+              if old in s:
+                  p.write_text(s.replace(old,new),encoding='utf-8')
+                  changed.append(str(p))
+          print('Changed:', *changed, sep='\n- ')
+          PY
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build latest /ops/ bundle
+        run: npx vite build --base=/ops/
+      - name: Package latest bundle
+        run: |
+          rm -rf .build
+          mkdir -p .build
+          cd dist
+          zip -r ../.build/ops-dist.zip .
+      - name: Commit source cleanup and temporary bundle
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git add -f .build/ops-dist.zip
+          git commit -m "Finalize operations center Vercel runtime URLs"
+          git push origin HEAD:main
