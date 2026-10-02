@@ -35,11 +35,13 @@ const STATUS_FILTERS = [
 ]
 
 const OPEN_STATUSES = ['new', 'contacting', 'quoted', 'contracted']
-const QUOTE_APP_ORIGIN = String(import.meta.env.VITE_QUOTE_APP_ORIGIN || 'https://ail-travel-main.vercel.app').replace(/\/+$/, '')
+const QUOTE_APP_ORIGIN = String(import.meta.env.VITE_QUOTE_APP_ORIGIN || 'https://ail-travel-main-e9rr.vercel.app').replace(/\/+$/, '')
 const CANCUN_QUOTE_URL = `${QUOTE_APP_ORIGIN}/admin/cancun-quote/`
 const MAURITIUS_QUOTE_URL = `${QUOTE_APP_ORIGIN}/admin/mauritius-quote/`
+const MALDIVES_QUOTE_URL = `${QUOTE_APP_ORIGIN}/admin/maldives-management/`
 const isCancun = value => /칸쿤|cancun/i.test(String(value || ''))
 const isMauritius = value => /모리셔스|mauritius/i.test(String(value || ''))
+const isMaldives = value => /몰디브|maldives/i.test(String(value || ''))
 
 const SOURCE_FILTERS = [
   ['all', '전체 경로'],
@@ -241,6 +243,13 @@ export default function ConsultationWorkspace({
   function openMauritiusQuote() {
     if (!selected?.request_code) return
     const url = new URL(MAURITIUS_QUOTE_URL)
+    url.searchParams.set('consultation', selected.request_code)
+    window.open(url.toString(), '_blank', 'noopener,noreferrer')
+  }
+
+  function openMaldivesQuote() {
+    if (!selected?.request_code) return
+    const url = new URL(MALDIVES_QUOTE_URL)
     url.searchParams.set('consultation', selected.request_code)
     window.open(url.toString(), '_blank', 'noopener,noreferrer')
   }
@@ -509,6 +518,28 @@ export default function ConsultationWorkspace({
             <div className="erpSuccess">이미 예약으로 전환된 상담입니다.</div>
           )}
 
+          {isMaldives(selected.destination) && (
+            <div className="erpConsultQuotePanel">
+              <div className="erpConsultQuoteHead">
+                <div>
+                  <small>MALDIVES QUOTE LINK</small>
+                  <b>몰디브 견적 · 운영센터 상담번호 연결</b>
+                  <span>{selected.request_code} 상담을 몰디브 관리자 화면으로 전달하고 동일 상담번호로 견적 버전을 관리합니다.</span>
+                </div>
+                <div>
+                  {(canEdit || canCreate) && (
+                    <button type="button" className="primary mini" onClick={openMaldivesQuote}>
+                      몰디브 견적 관리
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="erpConsultQuoteEmpty">
+                관리자 로그인 후 OPS 상담정보를 정확한 상담번호로 불러오고 V6.61 견적 작성 화면에 같은 상담번호를 전달합니다.
+              </div>
+            </div>
+          )}
+
           {isMauritius(selected.destination) && (
             <div className="erpConsultQuotePanel">
               <div className="erpConsultQuoteHead">
@@ -616,6 +647,11 @@ export default function ConsultationWorkspace({
             {canEdit && selected.status === 'new' && (
               <button type="button" className="secondary mini" disabled={saving} onClick={startContact}>
                 상담 시작
+              </button>
+            )}
+            {isMaldives(selected.destination) && (canEdit || canCreate) && (
+              <button type="button" className="primary mini" onClick={openMaldivesQuote}>
+                몰디브 견적 열기
               </button>
             )}
             {isMauritius(selected.destination) && (canEdit || canCreate) && (
