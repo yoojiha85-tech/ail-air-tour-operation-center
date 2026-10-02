@@ -39,9 +39,12 @@ const QUOTE_APP_ORIGIN = String(import.meta.env.VITE_QUOTE_APP_ORIGIN || 'https:
 const CANCUN_QUOTE_URL = `${QUOTE_APP_ORIGIN}/admin/cancun-quote/`
 const MAURITIUS_QUOTE_URL = `${QUOTE_APP_ORIGIN}/admin/mauritius-quote/`
 const MALDIVES_QUOTE_URL = `${QUOTE_APP_ORIGIN}/admin/maldives-management/`
+const PRODUCT_QUOTE_LINK_URL = `${QUOTE_APP_ORIGIN}/admin/product-quote-link/`
 const isCancun = value => /칸쿤|cancun/i.test(String(value || ''))
 const isMauritius = value => /모리셔스|mauritius/i.test(String(value || ''))
 const isMaldives = value => /몰디브|maldives/i.test(String(value || ''))
+const isPhuket = value => /푸켓|phuket/i.test(String(value || ''))
+const isHawaii = value => /하와이|hawaii/i.test(String(value || ''))
 
 const SOURCE_FILTERS = [
   ['all', '전체 경로'],
@@ -250,6 +253,14 @@ export default function ConsultationWorkspace({
   function openMaldivesQuote() {
     if (!selected?.request_code) return
     const url = new URL(MALDIVES_QUOTE_URL)
+    url.searchParams.set('consultation', selected.request_code)
+    window.open(url.toString(), '_blank', 'noopener,noreferrer')
+  }
+
+  function openProductQuoteLink(product) {
+    if (!selected?.request_code) return
+    const url = new URL(PRODUCT_QUOTE_LINK_URL)
+    url.searchParams.set('product', product)
     url.searchParams.set('consultation', selected.request_code)
     window.open(url.toString(), '_blank', 'noopener,noreferrer')
   }
@@ -540,6 +551,28 @@ export default function ConsultationWorkspace({
             </div>
           )}
 
+          {(isPhuket(selected.destination) || isHawaii(selected.destination)) && (
+            <div className="erpConsultQuotePanel">
+              <div className="erpConsultQuoteHead">
+                <div>
+                  <small>{isPhuket(selected.destination) ? 'PHUKET' : 'HAWAII'} QUOTE LINK</small>
+                  <b>{isPhuket(selected.destination) ? '푸켓' : '하와이'} 견적 · OPS 상담 연결</b>
+                  <span>{selected.request_code} 상담과 실제 발행 견적을 관리자 화면에서 정확한 견적 ID 기준으로 연결합니다.</span>
+                </div>
+                <div>
+                  {(canEdit || canCreate) && (
+                    <button type="button" className="primary mini" onClick={() => openProductQuoteLink(isPhuket(selected.destination) ? 'phuket' : 'hawaii')}>
+                      {isPhuket(selected.destination) ? '푸켓' : '하와이'} 견적 연결
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="erpConsultQuoteEmpty">
+                외부 견적앱에서 견적을 발행한 뒤 실제 견적번호를 확인해 연결합니다. 이름·날짜로 임의 자동매칭하지 않습니다.
+              </div>
+            </div>
+          )}
+
           {isMauritius(selected.destination) && (
             <div className="erpConsultQuotePanel">
               <div className="erpConsultQuoteHead">
@@ -652,6 +685,11 @@ export default function ConsultationWorkspace({
             {isMaldives(selected.destination) && (canEdit || canCreate) && (
               <button type="button" className="primary mini" onClick={openMaldivesQuote}>
                 몰디브 견적 열기
+              </button>
+            )}
+            {(isPhuket(selected.destination) || isHawaii(selected.destination)) && (canEdit || canCreate) && (
+              <button type="button" className="primary mini" onClick={() => openProductQuoteLink(isPhuket(selected.destination) ? 'phuket' : 'hawaii')}>
+                {isPhuket(selected.destination) ? '푸켓' : '하와이'} 견적 연결
               </button>
             )}
             {isMauritius(selected.destination) && (canEdit || canCreate) && (
